@@ -1,69 +1,300 @@
-import Image from "next/image";
+import Link from "next/link";
+import {
+  ArrowRight,
+  CalendarClock,
+  CircleAlert,
+  Download,
+  Rss,
+  Settings2,
+} from "lucide-react";
 
-export default function Home() {
+import { AutoRefresh } from "@/components/auto-refresh";
+import { EmptyState, PageHeader, Pill, SectionTitle, Stat } from "@/components/bits";
+import { Poster } from "@/components/poster";
+import { RelativeTime } from "@/components/relative-time";
+import { Button } from "@/components/ui/button";
+import { getDb } from "@/lib/core/db";
+import { pad } from "@/lib/core/engine";
+import * as repo from "@/lib/core/repo";
+import { getConfig } from "@/lib/core/settings";
+
+export const dynamic = "force-dynamic";
+
+export default function DashboardPage() {
+  const db = getDb();
+  const config = getConfig(db);
+
+  const shows = repo.listMedia({ kind: "tv" }, db);
+  const movies = repo.listMedia({ kind: "movie" }, db);
+  const feeds = repo.listFeeds(false, db);
+  const upcoming = repo.listUpcoming(14, db);
+  const history = repo.listHistory({ limit: 12 }, db);
+
+  const grabbedThisWeek = repo.countRecentGrabs(7, db);
+
+  const wantedEpisodes = shows.reduce(
+    (total, show) => total + repo.countEpisodes(show.id, db).wanted,
+    0,
+  );
+  const wantedMovies = movies.filter(
+    (movie) => movie.monitored && movie.state === "wanted",
+  ).length;
+
+  const brokenFeeds = feeds.filter((feed) => feed.enabled && feed.lastStatus === "error");
+  const needsSetup = feeds.length === 0 || shows.length + movies.length === 0;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <>
+      <AutoRefresh intervalMs={20_000} />
+
+      <PageHeader
+        eyebrow="Overview"
+        title="Control room"
+        description="What the watcher is looking for, and what it has found."
+      />
+
+      <div className="space-y-10 px-5 py-6 md:px-8 md:py-8">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat label="Shows followed" value={shows.filter((s) => s.monitored).length} />
+          <Stat label="Movies wanted" value={wantedMovies} tone={wantedMovies ? "signal" : undefined} />
+          <Stat
+            label="Episodes wanted"
+            value={wantedEpisodes}
+            tone={wantedEpisodes ? "signal" : undefined}
+          />
+          <Stat label="Grabbed this week" value={grabbedThisWeek} tone="online" />
+        </section>
+
+        {needsSetup && <SetupChecklist hasFeeds={feeds.length > 0} hasLibrary={shows.length + movies.length > 0} />}
+
+        {brokenFeeds.length > 0 && (
+          <div className="panel border-alert/40 bg-alert/5 px-4 py-3">
+            <div className="flex items-start gap-2.5">
+              <CircleAlert className="mt-0.5 size-4 shrink-0 text-alert" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-alert">
+                  {brokenFeeds.length} feed{brokenFeeds.length === 1 ? "" : "s"} failing
+                </p>
+                {brokenFeeds.map((feed) => (
+                  <p key={feed.id} className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    <span className="text-foreground/80">{feed.name}</span> — {feed.lastError}
+                  </p>
+                ))}
+              </div>
+              <Button asChild size="sm" variant="ghost">
+                <Link href="/settings">Fix</Link>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-8 lg:grid-cols-[1.15fr_1fr]">
+          <section>
+            <SectionTitle
+              action={
+                <span className="mono text-[11px] text-muted-foreground">next 14 days</span>
+              }
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              Airing soon
+            </SectionTitle>
+
+            {upcoming.length === 0 ? (
+              <EmptyState
+                icon={<CalendarClock className="size-6" />}
+                title="Nothing scheduled"
+                description="Episodes appear here once a show you follow has announced air dates."
+              />
+            ) : (
+              <ul className="panel divide-y divide-border">
+                {upcoming.slice(0, 9).map((episode) => (
+                  <li key={episode.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="w-9 shrink-0">
+                      <Poster
+                        src={episode.poster}
+                        alt={episode.mediaTitle}
+                        kind="tv"
+                        sizes="36px"
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium leading-tight">
+                        {episode.mediaTitle}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                        <span className="mono text-foreground/70">
+                          S{pad(episode.season)}E{pad(episode.number)}
+                        </span>
+                        {episode.title && ` · ${episode.title}`}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className="mono text-[11.5px] text-foreground/80">
+                        <RelativeTime value={episode.airDate} future />
+                      </p>
+                      {!episode.monitored && (
+                        <p className="label-mono mt-0.5 text-[9px]">ignored</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <SectionTitle
+              action={
+                <Link
+                  href="/activity"
+                  className="mono flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-signal"
+                >
+                  All activity <ArrowRight className="size-3" />
+                </Link>
+              }
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Latest activity
+            </SectionTitle>
+
+            {history.length === 0 ? (
+              <EmptyState
+                icon={<Download className="size-6" />}
+                title="Nothing yet"
+                description="Grabs and rejections show up here as the watcher works through your feeds."
+              />
+            ) : (
+              <ul className="panel divide-y divide-border">
+                {history.slice(0, 9).map((row) => (
+                  <li key={row.id} className="flex items-start gap-2.5 px-3 py-2.5">
+                    <EventDot event={row.event} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12.5px] leading-tight text-foreground/90">
+                        {row.title ?? row.mediaTitle ?? "—"}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {row.reason}
+                      </p>
+                    </div>
+                    <span className="mono shrink-0 text-[10.5px] text-muted-foreground">
+                      <RelativeTime value={row.createdAt} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+
+        <section className="grid gap-3 sm:grid-cols-2">
+          <FolderCard label="TV downloads" path={config.tv.downloadDir} />
+          <FolderCard label="Movie downloads" path={config.movies.downloadDir} />
+        </section>
+      </div>
+    </>
+  );
+}
+
+function EventDot({ event }: { event: string }) {
+  const tone =
+    event === "grabbed"
+      ? "bg-online"
+      : event === "error"
+        ? "bg-alert"
+        : event === "rejected"
+          ? "bg-muted-foreground/50"
+          : "bg-info";
+  return <span className={`mt-1.5 size-1.5 shrink-0 rounded-full ${tone}`} />;
+}
+
+function FolderCard({ label, path }: { label: string; path: string }) {
+  return (
+    <div className="panel flex items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0">
+        <p className="label-mono">{label}</p>
+        <p className="mono mt-1 truncate text-[12px] text-foreground/80">{path}</p>
+      </div>
+      <Button asChild size="sm" variant="ghost">
+        <Link href="/settings">
+          <Settings2 className="size-3.5" />
+        </Link>
+      </Button>
     </div>
+  );
+}
+
+function SetupChecklist({
+  hasFeeds,
+  hasLibrary,
+}: {
+  hasFeeds: boolean;
+  hasLibrary: boolean;
+}) {
+  return (
+    <section className="panel overflow-hidden">
+      <div className="grid-texture border-b border-border px-4 py-3">
+        <p className="label-mono text-foreground/70">Getting started</p>
+      </div>
+      <ol className="divide-y divide-border">
+        <ChecklistItem
+          done={hasFeeds}
+          title="Add your torrent RSS feed"
+          description="The watcher polls it for new releases. Separate feeds can be limited to TV or movies."
+          href="/settings"
+          cta="Open settings"
+          icon={<Rss className="size-4" />}
+        />
+        <ChecklistItem
+          done={hasLibrary}
+          title="Follow a show or add a movie"
+          description="Pick the quality you want for each one, or use the per-library defaults."
+          href="/add"
+          cta="Search"
+          icon={<Download className="size-4" />}
+        />
+      </ol>
+    </section>
+  );
+}
+
+function ChecklistItem({
+  done,
+  title,
+  description,
+  href,
+  cta,
+  icon,
+}: {
+  done: boolean;
+  title: string;
+  description: string;
+  href: string;
+  cta: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <li className="flex items-center gap-3.5 px-4 py-3.5">
+      <span
+        className={`flex size-8 shrink-0 items-center justify-center rounded-sm border ${
+          done
+            ? "border-online/40 bg-online/10 text-online"
+            : "border-signal/40 bg-signal/10 text-signal"
+        }`}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 text-[13.5px] font-medium">
+          {title}
+          {done && <Pill tone="online">done</Pill>}
+        </p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{description}</p>
+      </div>
+      {!done && (
+        <Button asChild size="sm" variant="secondary">
+          <Link href={href}>{cta}</Link>
+        </Button>
+      )}
+    </li>
   );
 }

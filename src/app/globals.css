@@ -1,26 +1,278 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * tvarr — broadcast control room.
+ *
+ * Graphite ground, hairline rules, one signal-amber accent and a mono
+ * typeface for anything technical. Poster art supplies the colour; the
+ * interface deliberately stays monochrome around it.
+ */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-archivo);
+
+  --color-signal: var(--signal);
+  --color-online: var(--online);
+  --color-alert: var(--alert);
+  --color-info: var(--info);
+  --color-line: var(--border);
+  --color-line-strong: var(--line-strong);
+  --color-surface: var(--surface);
+  --color-surface-high: var(--surface-high);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * One committed look. The palette lives on :root so every component picks it
+ * up, and `.dark` carries the same values so shadcn's dark: variants agree.
+ */
+:root,
+.dark {
+  --ground: #08090a;
+  --surface: #101416;
+  --surface-high: #171d20;
+  --line-strong: #2c3639;
+
+  --signal: #f5a524;
+  --online: #3bd07a;
+  --alert: #ff5d5d;
+  --info: #58c7e8;
+
+  --background: var(--ground);
+  --foreground: #e9eeee;
+  --card: var(--surface);
+  --card-foreground: #e9eeee;
+  --popover: #12171a;
+  --popover-foreground: #e9eeee;
+  --primary: var(--signal);
+  --primary-foreground: #17120a;
+  --secondary: var(--surface-high);
+  --secondary-foreground: #e9eeee;
+  --muted: var(--surface);
+  --muted-foreground: #8d999d;
+  --accent: var(--surface-high);
+  --accent-foreground: #ffffff;
+  --destructive: var(--alert);
+  --border: #212a2d;
+  --input: #212a2d;
+  --ring: var(--signal);
+
+  --chart-1: var(--signal);
+  --chart-2: var(--online);
+  --chart-3: var(--info);
+  --chart-4: #8d999d;
+  --chart-5: var(--alert);
+
+  --radius: 0.3rem;
+
+  --sidebar: #0b0e0f;
+  --sidebar-foreground: #e9eeee;
+  --sidebar-primary: var(--signal);
+  --sidebar-primary-foreground: #17120a;
+  --sidebar-accent: var(--surface-high);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #212a2d;
+  --sidebar-ring: var(--signal);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv01";
+    /* A cold pool of light behind the rail, so the page is not a flat slab. */
+    background-image:
+      radial-gradient(120rem 60rem at 8% -20%, rgba(88, 199, 232, 0.05), transparent 60%),
+      radial-gradient(80rem 40rem at 100% 0%, rgba(245, 165, 36, 0.045), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: var(--signal);
+    color: #17120a;
+  }
+
+  /* Thin, unobtrusive scrollbars — this is a dense interface. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #232c30;
+    border-radius: 99px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #354146;
+    background-clip: content-box;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Small uppercase mono caption used for every field and status label. */
+  .label-mono {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .mono {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The engraved rule that separates sections of the control surface. */
+  .rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      var(--border),
+      var(--border) 60%,
+      transparent
+    );
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  /* Faint engineering grid, used behind headers. */
+  .grid-texture {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .poster-frame {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: var(--surface-high);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 12px 28px -18px rgba(0, 0, 0, 0.9);
+  }
+
+  /* Live indicator for the watcher heartbeat. */
+  .signal-dot {
+    position: relative;
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 99px;
+    background: currentColor;
+  }
+  .signal-dot::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 99px;
+    border: 1px solid currentColor;
+    opacity: 0.45;
+    animation: signal-pulse 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .stagger-in {
+    animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes signal-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
