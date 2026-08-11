@@ -147,8 +147,12 @@ function WatcherPanel({
         </p>
 
         <Command label="In a terminal" value="pnpm watch" />
-        <Command label="Keep it running on macOS" value="pnpm run install:launchd" />
-        <Command label="Keep it running on Linux" value="pnpm run install:systemd" />
+        <Command
+          label="Install as a service (macOS + Linux), running this interface too"
+          value="pnpm run service:install"
+        />
+        <Command label="Update and restart everything" value="pnpm run update" />
+        <Command label="Check on it" value="pnpm run service:status" />
 
         <div className="mt-4 space-y-1.5">
           <p className="label-mono">Data directory</p>

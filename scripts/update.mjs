@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Updates tvarr in place and restarts the watcher.
+ * Updates tvarr in place and restarts it.
  *
  *   node scripts/update.mjs              pull, install, build, restart
  *   node scripts/update.mjs --no-build   skip the web build (watcher-only hosts)
  *   node scripts/update.mjs --force      run every step even if nothing was pulled
  *
- * Reinstalling the unit file rather than a plain restart is deliberate: it
+ * Reinstalling the unit files rather than a plain restart is deliberate: it
  * keeps the recorded node path correct across Node upgrades, which otherwise
- * leaves the service pointing at a version that no longer exists.
+ * leaves the services pointing at a version that no longer exists.
  */
 
 import { spawnSync } from "node:child_process";
@@ -110,23 +110,26 @@ if (!run("pnpm", ["install"]).ok) fail("pnpm install failed.");
 if (!skipBuild) {
   step("Building the web interface…");
   if (!run("pnpm", ["build"]).ok) {
-    fail("The build failed. The watcher was left running on the old code.");
+    // Deliberately left running: old code serving is better than nothing
+    // serving, and the operator can retry once the build is fixed.
+    fail("The build failed. tvarr was left running on the old code.");
   }
 }
 
-step("Restarting the watcher…");
+step("Restarting…");
 if (isInstalled()) {
-  // Rewrites the unit with current paths, then restarts.
-  const result = spawnSync(process.execPath, [path.join(projectRoot, "scripts", "service.mjs"), "install"], {
-    cwd: projectRoot,
-    stdio: "inherit",
-  });
-  if (result.status !== 0) fail("Could not restart the service. Check `pnpm run service:status`.");
+  // Rewrites the units with current paths, then restarts both.
+  const result = spawnSync(
+    process.execPath,
+    [path.join(projectRoot, "scripts", "service.mjs"), "install"],
+    { cwd: projectRoot, stdio: "inherit" },
+  );
+  if (result.status !== 0) fail("Could not restart. Check `pnpm run service:status`.");
 } else {
-  restart();
+  restart({ silent: true });
   console.log(
-    "  No service is installed — restart your watcher manually, or install one\n" +
-      "  with `pnpm run service:install`.",
+    "  No service is installed, so nothing was restarted. Install one with\n" +
+      "  `pnpm run service:install`, or restart your own processes.",
   );
 }
 

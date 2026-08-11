@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Mono } from "next/font/google";
 
 import { AppNav } from "@/components/app-nav";
+import { LogoMark } from "@/components/logo";
 import { WatcherStatus } from "@/components/watcher-status";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -59,13 +60,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   );
 }
 
-/** Record-light + wordmark, the one piece of branding in the interface. */
+/** The mark plus the name, the one piece of branding in the interface. */
 function Wordmark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="relative flex size-6 items-center justify-center rounded-[3px] bg-signal">
-        <span className="size-1.5 rounded-full bg-[#17120a]" />
-      </span>
+      <LogoMark className="size-6 shrink-0" />
       <span className="leading-none">
         <span className="block text-[17px] font-bold tracking-[-0.02em] text-foreground">
           tvarr

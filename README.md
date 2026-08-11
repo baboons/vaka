@@ -1,7 +1,13 @@
-# tvarr
+<p align="center">
+  <img src="public/logo.svg" width="96" height="96" alt="">
+</p>
 
-Follow TV shows and movies, watch your torrent RSS feeds, and automatically
-download the qualities you asked for.
+<h1 align="center">tvarr</h1>
+
+<p align="center">
+  Follow TV shows and movies, watch your torrent RSS feeds, and automatically
+  download the qualities you asked for.
+</p>
 
 Search for a show or a film, pick the quality you want, and a background
 watcher polls your RSS feeds. When a release matching one of your titles turns
@@ -18,13 +24,16 @@ Two processes share one SQLite database:
 
 | | |
 |---|---|
-| **Web interface** (`pnpm dev`) | Search, follow, configure. Never downloads anything. |
-| **Watcher** (`pnpm watch`) | Polls feeds, matches releases, writes `.torrent` files. Runs in the background. |
+| **Web interface** (`pnpm dev` / `pnpm start`) | Search, follow, configure. Never downloads anything. Port **4000** by default. |
+| **Watcher** (`pnpm watch`) | Polls feeds, matches releases, writes `.torrent` files. |
 
 The watcher must be running for anything to download. The web interface shows
 whether it is alive and queues work for it (a "check now", a manual grab)
 through a job table, so you can also run the watcher headless on a server and
 never open the UI at all.
+
+Installing tvarr as a service runs **both**, supervised separately, so a
+crashed UI never stops downloads.
 
 tvarr never talks to your torrent client. It drops files into a **blackhole
 folder** — every client supports watching a directory, and no credentials are
@@ -34,9 +43,11 @@ involved.
 
 ```bash
 pnpm install
-pnpm dev          # web interface on http://localhost:3000
+pnpm dev          # web interface on http://localhost:4000
 pnpm watch        # the watcher, in a second terminal
 ```
+
+Set `PORT` to use a different port: `PORT=8080 pnpm dev`.
 
 Then:
 
@@ -50,23 +61,60 @@ Then:
 Newly followed titles are immediately checked against releases already cached
 from your feeds, so you do not have to wait for the next poll.
 
-## Keeping the watcher running
+## Running it as a service
 
 ```bash
-pnpm run install:launchd    # macOS  (launchd user agent)
-pnpm run install:systemd    # Linux  (systemd user service)
-
-pnpm run service:print      # show the unit file without installing
-pnpm run service:remove     # uninstall
+pnpm install
+pnpm build                    # the web service needs a production build
+pnpm run service:install      # installs and starts both, on Linux and macOS
 ```
 
-Both install a **per-user** service that starts at login and restarts if it
-exits — the watcher writes into your home directory and must run as you, not as
-root. Logs go to `~/.tvarr/watcher.log` (launchd) or the journal
-(`journalctl --user -u tvarr-watcher -f`).
+That installs two **per-user** services — systemd user units on Linux,
+launchd agents on macOS — which start at login and restart if they exit:
 
-On Linux, to keep it running while you are logged out:
-`sudo loginctl enable-linger $USER`.
+| Unit | What it does |
+|---|---|
+| `tvarr-watcher` | Polls feeds and downloads |
+| `tvarr-web` | Serves the interface on port 4000 |
+
+They are per-user, not system-wide, because tvarr writes into your home
+directory and must run as you rather than as root.
+
+```bash
+pnpm run service:status       # both services + the watcher's heartbeat
+pnpm run service:logs         # follow both logs
+pnpm run service:restart
+pnpm run service:stop
+pnpm run service:print        # show the unit files without installing
+pnpm run service:uninstall
+```
+
+Install on a different port with `PORT=8080 pnpm run service:install` — the
+port is baked into the unit, so re-run this to change it.
+
+On Linux, to keep tvarr running while you are logged out:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+## Updating
+
+```bash
+pnpm run update               # pull, install, build, restart both services
+```
+
+It fast-forwards only, so it can never lose local commits, and it refuses to
+run with a dirty working tree. If nothing was pulled it stops early instead of
+rebuilding. `--no-build` skips the web build on watcher-only hosts; `--force`
+runs every step regardless.
+
+The update reinstalls the unit files before restarting, which keeps the
+recorded `node` path correct across Node upgrades — otherwise a service can end
+up pointing at a version that no longer exists.
+
+> Use `pnpm run update`. Plain `pnpm update` is pnpm's own dependency updater,
+> which is a different thing entirely.
 
 ## Feeds
 
@@ -141,13 +189,18 @@ ignored silently.
 ## Commands
 
 ```bash
-pnpm dev          # web interface (development)
+pnpm dev          # web interface (development), port 4000
 pnpm build        # production build
-pnpm start        # production web interface
+pnpm start        # production web interface, port 4000
 pnpm watch        # the watcher
 pnpm watch:dev    # the watcher, restarting on file changes
+
+pnpm run update   # pull, install, build, restart the services
+pnpm run service:install|status|logs|restart|start|stop|print|uninstall
+
 pnpm test         # unit tests + end-to-end grab test
 pnpm typecheck
+pnpm lint
 ```
 
 `pnpm test` includes a test that stands up a real HTTP server serving an RSS
@@ -159,7 +212,13 @@ feed and asserts the right `.torrent` files land in the right folders.
   stray copy cannot double-grab. Use `pnpm watch --force` to override.
 - Anime absolute numbering (`Show - 137`) is not matched; season/episode,
   `1x02`, date-based daily shows and multi-episode files are.
-- There is no authentication. Bind it to localhost or put it behind something
-  that does auth before exposing it.
+- There is no authentication. Keep it on your LAN or put it behind something
+  that does auth before exposing it to the internet.
+- **Opening the dev server from another machine** (`http://10.0.1.2:4000`)
+  needs that origin allowlisted, or Next returns 403 for every `/_next/*`
+  chunk and the hot-reload socket fails. This machine's own LAN addresses are
+  allowlisted automatically; add hostnames with
+  `TVARR_DEV_ORIGINS=tvarr.local,box.lan`. Production (`pnpm start`, and the
+  installed service) is unaffected.
 - tvarr only downloads the `.torrent`; seeding, unpacking and renaming are your
   torrent client's job.
