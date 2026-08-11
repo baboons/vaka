@@ -239,6 +239,32 @@ did not create:
   can write somewhere else.
 - Files that match nothing you follow are left exactly where they are.
 
+### Retiring torrents after they have seeded
+
+Once a torrent has seeded for long enough — **N days, or a ratio, whichever
+comes first** (or both, if you prefer) — tvarr removes it from Transmission and
+clears the download folder. Your library copy stays.
+
+Worth being precise about what this frees, because it depends on the mode:
+
+| Mode | What retiring does |
+|---|---|
+| **Hardlink** | Frees **nothing** — the download and the library file are already the same data on disk. It ends seeding and clears the download folder. |
+| Hardlink that fell back to a copy | Frees the duplicate, which is real space. |
+| **Copy** | Frees the duplicate. |
+| **Move** | The download is long gone; this just clears the dead torrent out of Transmission. |
+
+So with hardlinks this is about meeting a tracker's seeding rule and keeping
+the download folder tidy, not about disk space — you were never paying twice.
+
+Two guards, since this deletes things:
+
+- **Only torrents tvarr imported are ever touched.** Anything you added to
+  Transmission yourself is invisible to it.
+- **The library copy is confirmed present first.** If the file was moved or
+  deleted out of the library, the download is left alone and the reason is
+  logged, rather than leaving you with no copy at all.
+
 ### Transmission
 
 Turn on **Settings → Import → Transmission** and tvarr asks Transmission which

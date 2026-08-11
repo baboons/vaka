@@ -109,6 +109,21 @@ const importConfigSchema = z.object({
   minSizeMb: z.number().int().min(0).max(100_000).default(50),
   /** Minutes between sweeps of the watch folder. */
   scanIntervalMinutes: z.number().int().min(1).max(1440).default(5),
+
+  /**
+   * Retiring a torrent once its seeding obligation is met.
+   *
+   * With a hardlink the download and the library file are one and the same on
+   * disk, so this frees no space — it ends seeding and clears the download
+   * folder. It does reclaim space when the hardlink fell back to a copy.
+   */
+  cleanupEnabled: z.boolean().default(false),
+  /** Seed at least this many days. 0 ignores time. */
+  cleanupAfterDays: z.number().min(0).max(3650).default(14),
+  /** Seed to at least this ratio. 0 ignores ratio. */
+  cleanupMinRatio: z.number().min(0).max(1000).default(1),
+  /** Require both thresholds rather than whichever comes first. */
+  cleanupRequireBoth: z.boolean().default(false),
 });
 
 /** Transmission's RPC endpoint, so tvarr knows when a download finished. */

@@ -36,6 +36,10 @@ export interface TransmissionTorrent {
   downloadDir: string;
   doneDate: number;
   totalSize: number;
+  /** Uploaded / downloaded, as Transmission computes it. */
+  uploadRatio: number;
+  /** How long it has been seeding, in seconds. */
+  secondsSeeding: number;
 }
 
 /** Session ids are per-connection; cached so we do not pay the 409 each time. */
@@ -146,9 +150,28 @@ export async function listTorrents(config: TransmissionConfig): Promise<Transmis
       "downloadDir",
       "doneDate",
       "totalSize",
+      "uploadRatio",
+      "secondsSeeding",
     ],
   });
   return result.torrents ?? [];
+}
+
+/**
+ * Remove a torrent, optionally deleting the data it downloaded.
+ *
+ * With a hardlinked import, "its data" is only the download path — the library
+ * file is a separate directory entry for the same bytes and survives.
+ */
+export async function removeTorrent(
+  config: TransmissionConfig,
+  id: number,
+  deleteLocalData: boolean,
+): Promise<void> {
+  await call(config, "torrent-remove", {
+    ids: [id],
+    "delete-local-data": deleteLocalData,
+  });
 }
 
 /** Downloads that have finished and are therefore safe to import. */

@@ -798,6 +798,9 @@ export interface ImportRecord {
   fileCount: number;
   status: string;
   detail: string | null;
+  /** Files written into the library, checked before cleaning up the source. */
+  libraryPaths: string[];
+  cleanedAt: string | null;
   createdAt: string;
 }
 
@@ -810,6 +813,8 @@ function mapImport(row: Row): ImportRecord {
     fileCount: (row.file_count as number) ?? 0,
     status: row.status as string,
     detail: (row.detail as string) ?? null,
+    libraryPaths: parseJson<string[]>(row.library_paths, []),
+    cleanedAt: (row.cleaned_at as string) ?? null,
     createdAt: row.created_at as string,
   };
 }
@@ -830,16 +835,18 @@ export function recordImport(
     fileCount?: number;
     status: "done" | "failed" | "skipped";
     detail?: string | null;
+    libraryPaths?: string[];
   },
   db: Db = getDb(),
 ): void {
   db.prepare(
-    `INSERT INTO imports (source_key, name, path, file_count, status, detail, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO imports (source_key, name, path, file_count, status, detail, library_paths, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(source_key) DO UPDATE SET
-       file_count = excluded.file_count,
-       status     = excluded.status,
-       detail     = excluded.detail`,
+       file_count    = excluded.file_count,
+       status        = excluded.status,
+       detail        = excluded.detail,
+       library_paths = excluded.library_paths`,
   ).run(
     entry.sourceKey,
     entry.name ?? null,
@@ -847,7 +854,32 @@ export function recordImport(
     entry.fileCount ?? 0,
     entry.status,
     entry.detail ?? null,
+    JSON.stringify(entry.libraryPaths ?? []),
     nowIso(),
+  );
+}
+
+/** Imports that succeeded and have not been cleaned up yet. */
+export function listCleanupCandidates(db: Db = getDb()): ImportRecord[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM imports
+       WHERE status = 'done' AND cleaned_at IS NULL AND file_count > 0
+       ORDER BY created_at ASC`,
+    )
+    .all() as Row[];
+  return rows.map(mapImport);
+}
+
+export function markImportCleaned(
+  sourceKey: string,
+  detail: string,
+  db: Db = getDb(),
+): void {
+  db.prepare("UPDATE imports SET cleaned_at = ?, detail = ? WHERE source_key = ?").run(
+    nowIso(),
+    detail,
+    sourceKey,
   );
 }
 

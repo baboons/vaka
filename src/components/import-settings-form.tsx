@@ -193,6 +193,122 @@ export function ImportSettingsForm({
 
       <div className="rule" />
 
+      {/* ---------------- Retiring finished torrents ---------------- */}
+
+      <div className="space-y-4">
+        <label className="flex cursor-pointer items-start justify-between gap-4 rounded-sm border border-border bg-secondary/30 px-3 py-2.5">
+          <span>
+            <span className="block text-[13px] font-medium">
+              Retire torrents once they have seeded enough
+            </span>
+            <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
+              Removes the torrent from Transmission and clears the download folder. Your library
+              copy is kept.
+            </span>
+          </span>
+          <Switch
+            checked={config.cleanupEnabled}
+            onCheckedChange={(cleanupEnabled) => setConfig({ ...config, cleanupEnabled })}
+          />
+        </label>
+
+        {config.cleanupEnabled && (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="label-mono">After seeding for</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={config.cleanupAfterDays}
+                    className="mono pr-14"
+                    onChange={(event) =>
+                      setConfig({
+                        ...config,
+                        cleanupAfterDays: Math.max(0, Number(event.target.value) || 0),
+                      })
+                    }
+                  />
+                  <span className="mono pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">
+                    days
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="label-mono">Or once the ratio reaches</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={config.cleanupMinRatio}
+                  className="mono"
+                  onChange={(event) =>
+                    setConfig({
+                      ...config,
+                      cleanupMinRatio: Math.max(0, Number(event.target.value) || 0),
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <p className="text-[11.5px] leading-snug text-muted-foreground">
+              Set either to <span className="mono">0</span> to ignore it. With both at 0 nothing
+              is ever retired.
+            </p>
+
+            <label className="flex cursor-pointer items-start justify-between gap-4 rounded-sm border border-border bg-secondary/30 px-3 py-2.5">
+              <span>
+                <span className="block text-[13px] font-medium">Require both, not either</span>
+                <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
+                  {config.cleanupRequireBoth
+                    ? "Waits for the days and the ratio."
+                    : "Retires on whichever comes first, which is how trackers usually word their rules."}
+                </span>
+              </span>
+              <Switch
+                checked={config.cleanupRequireBoth}
+                onCheckedChange={(cleanupRequireBoth) =>
+                  setConfig({ ...config, cleanupRequireBoth })
+                }
+              />
+            </label>
+
+            <div className="rounded-sm border border-border bg-background px-3 py-2.5">
+              <p className="text-[11.5px] leading-relaxed text-muted-foreground">
+                {config.mode === "hardlink" ? (
+                  <>
+                    With <span className="text-foreground/80">hardlink</span>, the download and
+                    the library file are the same data on disk, so retiring frees no space — it
+                    ends seeding and clears the download folder. It does free space when the
+                    hardlink had to fall back to a copy across drives.
+                  </>
+                ) : config.mode === "copy" ? (
+                  <>
+                    With <span className="text-foreground/80">copy</span>, retiring deletes the
+                    duplicate and genuinely frees the space.
+                  </>
+                ) : (
+                  <>
+                    With <span className="text-foreground/80">move</span>, the download is
+                    already gone; retiring only clears the dead torrent out of Transmission.
+                  </>
+                )}
+              </p>
+              <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                Only torrents tvarr imported are touched, and never before checking the library
+                copy is still there.
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="rule" />
+
       {/* ---------------- Transmission ---------------- */}
 
       <div className="space-y-5">

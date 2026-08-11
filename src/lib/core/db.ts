@@ -149,14 +149,16 @@ CREATE TABLE IF NOT EXISTS settings (
 -- One row per download that has been filed into the library, so a torrent
 -- that keeps seeding is not imported again on every scan.
 CREATE TABLE IF NOT EXISTS imports (
-  id         INTEGER PRIMARY KEY,
-  source_key TEXT    NOT NULL UNIQUE,
-  name       TEXT,
-  path       TEXT,
-  file_count INTEGER NOT NULL DEFAULT 0,
-  status     TEXT    NOT NULL,
-  detail     TEXT,
-  created_at TEXT    NOT NULL
+  id            INTEGER PRIMARY KEY,
+  source_key    TEXT    NOT NULL UNIQUE,
+  name          TEXT,
+  path          TEXT,
+  file_count    INTEGER NOT NULL DEFAULT 0,
+  status        TEXT    NOT NULL,
+  detail        TEXT,
+  library_paths TEXT    NOT NULL DEFAULT '[]',
+  cleaned_at    TEXT,
+  created_at    TEXT    NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_imports_created ON imports (created_at DESC);
@@ -178,6 +180,10 @@ CREATE TABLE IF NOT EXISTS cache (
  */
 const ADDED_COLUMNS: Array<{ table: string; column: string; definition: string }> = [
   { table: "feed_items", column: "processed_at", definition: "TEXT" },
+  // Where the import landed, so post-seeding cleanup can confirm the library
+  // copy still exists before removing the download.
+  { table: "imports", column: "library_paths", definition: "TEXT NOT NULL DEFAULT '[]'" },
+  { table: "imports", column: "cleaned_at", definition: "TEXT" },
 ];
 
 function applyMigrations(db: Db): void {

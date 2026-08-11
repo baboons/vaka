@@ -110,6 +110,7 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
         name: torrent.name,
         path: source,
         fileCount: outcome.imported.length,
+        libraryPaths: outcome.imported.map((item) => item.destination),
         status: outcome.imported.length ? "done" : outcome.failed.length ? "failed" : "skipped",
         detail: outcome.imported.length
           ? null
@@ -158,6 +159,7 @@ export async function scanWatchDir(db: Db = getDb()): Promise<ScanSummary> {
         name: entry.name,
         path: source,
         fileCount: outcome.imported.length,
+        libraryPaths: outcome.imported.map((item) => item.destination),
         status: outcome.imported.length ? "done" : outcome.failed.length ? "failed" : "skipped",
         detail: outcome.imported.length
           ? null
@@ -170,8 +172,169 @@ export async function scanWatchDir(db: Db = getDb()): Promise<ScanSummary> {
   return summary;
 }
 
-/** Both sources, for the scheduler and the "import now" action. */
-export async function scanAll(db: Db = getDb()): Promise<ScanSummary> {
+/* ------------------------------------------------------------------ */
+/* Retiring torrents once they have seeded enough                       */
+/* ------------------------------------------------------------------ */
+
+export interface CleanupSummary {
+  checked: number;
+  cleaned: number;
+  freedBytes: number;
+  errors: string[];
+}
+
+export interface SeedingThresholds {
+  afterDays: number;
+  minRatio: number;
+  requireBoth: boolean;
+}
+
+/**
+ * Has this torrent seeded enough to retire?
+ *
+ * With `requireBoth` off — the default, and how trackers usually phrase their
+ * rules — either threshold is enough. A threshold set to 0 is ignored, and if
+ * both are 0 nothing is ever cleaned up.
+ */
+export function hasSeededEnough(
+  torrent: { uploadRatio: number; secondsSeeding: number },
+  thresholds: SeedingThresholds,
+): { met: boolean; reason: string } {
+  const days = Math.max(0, torrent.secondsSeeding) / 86400;
+  const ratio = Math.max(0, torrent.uploadRatio);
+
+  const checks: Array<{ met: boolean; label: string }> = [];
+  if (thresholds.afterDays > 0) {
+    checks.push({
+      met: days >= thresholds.afterDays,
+      label: `seeded ${days.toFixed(1)} of ${thresholds.afterDays} days`,
+    });
+  }
+  if (thresholds.minRatio > 0) {
+    checks.push({
+      met: ratio >= thresholds.minRatio,
+      label: `ratio ${ratio.toFixed(2)} of ${thresholds.minRatio}`,
+    });
+  }
+
+  if (!checks.length) return { met: false, reason: "no thresholds set" };
+
+  const met = thresholds.requireBoth
+    ? checks.every((check) => check.met)
+    : checks.some((check) => check.met);
+
+  return { met, reason: checks.map((check) => check.label).join(", ") };
+}
+
+/**
+ * Remove torrents tvarr imported once they have seeded enough.
+ *
+ * Two things make this safe to run unattended:
+ *   - only torrents recorded in the imports ledger are considered, so nothing
+ *     the user added by hand is ever touched
+ *   - the library copy is confirmed to still exist first, so a file that was
+ *     moved or deleted from the library is never left with no copy at all
+ */
+export async function cleanupSeeded(db: Db = getDb()): Promise<CleanupSummary> {
+  const config = getConfig(db);
+  const summary: CleanupSummary = { checked: 0, cleaned: 0, freedBytes: 0, errors: [] };
+
+  if (!config.importing.cleanupEnabled || !config.transmission.enabled) return summary;
+  if (config.importing.cleanupAfterDays <= 0 && config.importing.cleanupMinRatio <= 0) {
+    return summary;
+  }
+
+  const candidates = repo.listCleanupCandidates(db);
+  if (!candidates.length) return summary;
+
+  const byHash = new Map(
+    candidates
+      .filter((record) => record.sourceKey.startsWith("transmission:"))
+      .map((record) => [record.sourceKey.slice("transmission:".length), record]),
+  );
+  if (!byHash.size) return summary;
+
+  let torrents: transmission.TransmissionTorrent[];
+  try {
+    torrents = await transmission.listTorrents(config.transmission);
+  } catch (error) {
+    summary.errors.push(error instanceof Error ? error.message : String(error));
+    return summary;
+  }
+
+  const thresholds: SeedingThresholds = {
+    afterDays: config.importing.cleanupAfterDays,
+    minRatio: config.importing.cleanupMinRatio,
+    requireBoth: config.importing.cleanupRequireBoth,
+  };
+
+  for (const torrent of torrents) {
+    const record = byHash.get(torrent.hashString);
+    if (!record) continue;
+    summary.checked += 1;
+
+    const verdict = hasSeededEnough(torrent, thresholds);
+    if (!verdict.met) continue;
+
+    const libraryFiles = record.libraryPaths;
+
+    // Imports recorded before cleanup existed have no destinations stored, so
+    // there is nothing to verify. Retire them from consideration quietly
+    // rather than erroring on every sweep for the rest of time.
+    if (!libraryFiles.length) {
+      repo.markImportCleaned(
+        record.sourceKey,
+        "left alone — imported before tvarr tracked library paths",
+        db,
+      );
+      continue;
+    }
+
+    // The whole point of the import was the library copy. If it is gone,
+    // deleting the download would leave nothing at all.
+    const present = await Promise.all(
+      libraryFiles.map(async (file) => {
+        try {
+          await fs.access(file);
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    );
+
+    if (present.some((exists) => !exists)) {
+      const message = `library copy missing, left ${torrent.name} alone`;
+      summary.errors.push(message);
+      repo.addHistory({ event: "error", title: torrent.name, reason: `cleanup skipped — ${message}` }, db);
+      continue;
+    }
+
+    try {
+      await transmission.removeTorrent(config.transmission, torrent.id, true);
+      repo.markImportCleaned(record.sourceKey, `retired after seeding (${verdict.reason})`, db);
+      summary.cleaned += 1;
+      summary.freedBytes += torrent.totalSize ?? 0;
+
+      repo.addHistory(
+        {
+          event: "info",
+          title: torrent.name,
+          reason: `seeding finished (${verdict.reason}) — removed from Transmission, library copy kept`,
+        },
+        db,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      summary.errors.push(`${torrent.name}: ${message}`);
+    }
+  }
+
+  return summary;
+}
+
+/** Both sources plus cleanup, for the scheduler and the "import now" action. */
+export async function scanAll(db: Db = getDb()): Promise<ScanSummary & { cleaned: number }> {
   const summary = empty();
   for (const scan of [scanTransmission, scanWatchDir]) {
     const result = await scan(db);
@@ -182,13 +345,24 @@ export async function scanAll(db: Db = getDb()): Promise<ScanSummary> {
     summary.failed += result.failed;
     summary.errors.push(...result.errors);
   }
-  return summary;
+
+  // Retiring finished torrents happens on the same pass; it is cheap and
+  // needs the same connection.
+  const cleanup = await cleanupSeeded(db);
+  summary.errors.push(...cleanup.errors);
+
+  return { ...summary, cleaned: cleanup.cleaned };
 }
 
-export function describeScan(summary: ScanSummary): string {
-  if (!summary.considered) return "Nothing new to import";
-  const parts = [`${summary.files} file${summary.files === 1 ? "" : "s"} imported`];
-  if (summary.skipped) parts.push(`${summary.skipped} skipped`);
-  if (summary.failed) parts.push(`${summary.failed} failed`);
-  return parts.join(", ");
+export function describeScan(summary: ScanSummary & { cleaned?: number }): string {
+  const parts: string[] = [];
+  if (summary.considered) {
+    parts.push(`${summary.files} file${summary.files === 1 ? "" : "s"} imported`);
+    if (summary.skipped) parts.push(`${summary.skipped} skipped`);
+    if (summary.failed) parts.push(`${summary.failed} failed`);
+  }
+  if (summary.cleaned) {
+    parts.push(`${summary.cleaned} torrent${summary.cleaned === 1 ? "" : "s"} retired`);
+  }
+  return parts.length ? parts.join(", ") : "Nothing new to import";
 }

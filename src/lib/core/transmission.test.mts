@@ -185,6 +185,55 @@ test("summarises the server for the settings screen", async () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Seeding thresholds                                                   */
+/* ------------------------------------------------------------------ */
+
+const { hasSeededEnough } = await import("./import-runner");
+
+const seeded = (days: number, ratio: number) => ({
+  secondsSeeding: days * 86400,
+  uploadRatio: ratio,
+});
+
+test("retires a torrent once either threshold is met", () => {
+  const rules = { afterDays: 14, minRatio: 1, requireBoth: false };
+
+  assert.equal(hasSeededEnough(seeded(15, 0.2), rules).met, true, "time alone is enough");
+  assert.equal(hasSeededEnough(seeded(2, 1.5), rules).met, true, "ratio alone is enough");
+  assert.equal(hasSeededEnough(seeded(2, 0.3), rules).met, false, "neither met");
+});
+
+test("can require both thresholds instead", () => {
+  const rules = { afterDays: 14, minRatio: 1, requireBoth: true };
+
+  assert.equal(hasSeededEnough(seeded(15, 0.2), rules).met, false);
+  assert.equal(hasSeededEnough(seeded(2, 1.5), rules).met, false);
+  assert.equal(hasSeededEnough(seeded(15, 1.5), rules).met, true);
+});
+
+test("a threshold of zero is ignored rather than instantly true", () => {
+  // Ratio only: a brand new torrent must not qualify on its zero-day rule.
+  const ratioOnly = { afterDays: 0, minRatio: 2, requireBoth: false };
+  assert.equal(hasSeededEnough(seeded(0, 0.1), ratioOnly).met, false);
+  assert.equal(hasSeededEnough(seeded(0, 2.5), ratioOnly).met, true);
+
+  // Both zero means cleanup can never trigger.
+  const disabled = { afterDays: 0, minRatio: 0, requireBoth: false };
+  assert.equal(hasSeededEnough(seeded(999, 99), disabled).met, false);
+  assert.match(hasSeededEnough(seeded(999, 99), disabled).reason, /no thresholds/);
+});
+
+test("explains where a torrent stands", () => {
+  const verdict = hasSeededEnough(seeded(3.5, 0.75), {
+    afterDays: 14,
+    minRatio: 1,
+    requireBoth: false,
+  });
+  assert.match(verdict.reason, /seeded 3\.5 of 14 days/);
+  assert.match(verdict.reason, /ratio 0\.75 of 1/);
+});
+
+/* ------------------------------------------------------------------ */
 /* Library convention detection                                         */
 /* ------------------------------------------------------------------ */
 

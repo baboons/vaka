@@ -39,6 +39,7 @@ function configure(mode: "hardlink" | "copy" | "move") {
   settings.saveKindConfig("tv", { ...defaults.tv, libraryDir: tvLibrary });
   settings.saveKindConfig("movie", { ...defaults.movies, libraryDir: movieLibrary });
   settings.saveImportConfig({
+    ...defaults.importing,
     enabled: true,
     watchDir: downloads,
     mode,
@@ -279,6 +280,52 @@ test("move mode relocates the file instead of linking it", async () => {
   await importPath(source, getDb(), { releaseName: path.basename(source) });
 
   await assert.rejects(() => fs.stat(source), "the source should be gone after a move");
+});
+
+test("cleanup refuses to retire a torrent whose library copy has vanished", async () => {
+  const { cleanupSeeded } = await import("./import-runner");
+  const db = getDb();
+
+  settings.saveImportConfig({
+    ...settings.getConfig().importing,
+    enabled: true,
+    cleanupEnabled: true,
+    cleanupAfterDays: 1,
+    cleanupMinRatio: 0,
+  });
+  settings.saveTransmissionConfig({
+    ...settings.getConfig().transmission,
+    enabled: true,
+    // Unreachable on purpose: the guard must fire before any RPC call, and a
+    // connection error must never be mistaken for permission to delete.
+    url: "http://127.0.0.1:9",
+  });
+
+  repo.recordImport(
+    {
+      sourceKey: "transmission:ghost",
+      name: "Some.Show.S01E01",
+      status: "done",
+      fileCount: 1,
+      libraryPaths: [path.join(tvLibrary, "does-not-exist.mkv")],
+    },
+    db,
+  );
+
+  const summary = await cleanupSeeded(db);
+  assert.equal(summary.cleaned, 0, "nothing may be retired when the library copy is missing");
+
+  const record = repo.listImports(50, db).find((row) => row.sourceKey === "transmission:ghost");
+  assert.equal(record?.cleanedAt, null, "the import stays open for another look");
+
+  settings.saveImportConfig({ ...settings.getConfig().importing, cleanupEnabled: false });
+  settings.saveTransmissionConfig({ ...settings.getConfig().transmission, enabled: false });
+});
+
+test("cleanup does nothing while it is switched off", async () => {
+  const { cleanupSeeded } = await import("./import-runner");
+  const summary = await cleanupSeeded(getDb());
+  assert.deepEqual(summary, { checked: 0, cleaned: 0, freedBytes: 0, errors: [] });
 });
 
 test("respects a library that names seasons differently", async () => {
