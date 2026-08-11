@@ -195,6 +195,69 @@ A profile controls:
   prefer.
 - **Season packs** (TV) — off by default.
 
+## Filing downloads into your library
+
+tvarr can take finished downloads and put them where Plex expects them:
+
+```
+/media/TV/The Bear (2022)/Season 03/The Bear (2022) - S03E01 - Tomorrow.mkv
+/media/Movies/Dune Part Two (2024)/Dune Part Two (2024).mkv
+```
+
+Season folders are created when they are missing, subtitles travel with their
+video, and samples and trailers are left behind.
+
+### It reads your library first
+
+Under **Settings → TV / Movies**, *Analyse* scans the folder you point it at and
+proposes naming that matches what is already there — whether seasons are
+`Season 01`, `Season 1` or `S01`, and whether folders carry the year. If your
+library says `The Bear/Season 1`, tvarr keeps writing `The Bear/Season 1`
+rather than imposing its own defaults on a library you have already curated.
+*Use these conventions* fills the templates in; you can then edit them freely
+with a live preview.
+
+Tokens: `{title}` `{year}` `{season}` `{season:00}` `{episode}` `{episode:00}`
+`{episodeTitle}` `{quality}` `{group}`. A token with no value disappears along
+with any brackets around it, and `{episode}` renders `E01-E02` for a
+double-length episode.
+
+### How files are placed
+
+| Mode | Effect |
+|---|---|
+| **Hardlink** (default) | No extra disk space, and the torrent keeps seeding. Falls back to a copy across filesystems. |
+| **Copy** | Seeding continues; the space is used twice. |
+| **Move** | Frees the space at once, but seeding stops. |
+
+The safety rules, since this is the only part of tvarr that touches files it
+did not create:
+
+- **Nothing is ever overwritten.** A second copy lands as `… (1).mkv`.
+- **Nothing is deleted** unless you chose *move*.
+- Destinations are checked to be inside the library folder, so no release name
+  can write somewhere else.
+- Files that match nothing you follow are left exactly where they are.
+
+### Transmission
+
+Turn on **Settings → Import → Transmission** and tvarr asks Transmission which
+downloads have finished, then files them. Nothing changes on the Transmission
+side beyond having remote access switched on — `localhost:9091` is enough, and
+tvarr fills in the rest of the RPC URL.
+
+If Transmission runs in a container or on another machine, its idea of the
+filesystem differs from yours; the **path mapping** fields translate (e.g.
+`/downloads` → `/mnt/nas/downloads`). A failed import says exactly which path
+could not be reached.
+
+Connecting to a client with years of history does not suddenly file years of
+downloads: existing completed torrents are noted and left alone unless you ask
+for them.
+
+Without a torrent client, set a **watch folder** instead and anything that
+appears there is filed.
+
 ## Plex
 
 If you already have a Plex server, point tvarr at it under **Settings → Plex**

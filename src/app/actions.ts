@@ -14,21 +14,30 @@ import { getDb } from "@/lib/core/db";
 import { addMedia as addMediaToLibrary, type MonitorMode } from "@/lib/core/engine";
 import { fetchFeed } from "@/lib/core/feed";
 import { checkDownloadDir } from "@/lib/core/grab";
+import { inspectLibrary, type LibraryReport } from "@/lib/core/inspect-library";
 import { normalizePlexUrl, testConnection } from "@/lib/core/plex";
 import * as providers from "@/lib/core/providers";
 import * as repo from "@/lib/core/repo";
 import {
   generalConfigSchema,
   getConfig,
+  getKindConfig,
+  importConfigSchema,
   kindConfigSchema,
   plexConfigSchema,
   saveGeneralConfig,
+  saveImportConfig,
   saveKindConfig,
   savePlexConfig,
+  saveTransmissionConfig,
+  transmissionConfigSchema,
   type GeneralConfig,
+  type ImportConfig,
   type KindConfig,
   type PlexConfig,
+  type TransmissionConfig,
 } from "@/lib/core/settings";
+import * as transmission from "@/lib/core/transmission";
 import type { EpisodeState, MediaKind, QualityProfile } from "@/lib/core/types";
 
 export interface ActionResult {
@@ -341,6 +350,108 @@ export async function requestPlexSync(): Promise<ActionResult> {
   repo.enqueueJob("sync_plex");
   refreshAllViews();
   return { ok: true, message: "Queued a Plex scan — the watcher picks it up within seconds" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Importing into the library                                           */
+/* ------------------------------------------------------------------ */
+
+export async function saveImportSettings(config: ImportConfig): Promise<ActionResult> {
+  const parsed = importConfigSchema.safeParse(config);
+  if (!parsed.success) return { ok: false, message: "Those settings are not valid" };
+
+  saveImportConfig(parsed.data);
+  refreshAllViews();
+  return { ok: true, message: "Saved" };
+}
+
+/** Saves the destination folder and naming templates for one library. */
+export async function saveLibraryNaming(
+  kind: MediaKind,
+  patch: {
+    libraryDir: string;
+    folderTemplate: string;
+    seasonTemplate: string;
+    fileTemplate: string;
+  },
+): Promise<ActionResult> {
+  const current = getKindConfig(kind, getDb());
+  const parsed = kindConfigSchema.safeParse({ ...current, ...patch });
+  if (!parsed.success) return { ok: false, message: "Those settings are not valid" };
+
+  saveKindConfig(kind, parsed.data);
+  refreshAllViews();
+
+  if (!parsed.data.libraryDir.trim()) return { ok: true, message: "Saved" };
+
+  const check = await checkDownloadDir(parsed.data.libraryDir);
+  return {
+    ok: true,
+    message: check.ok ? "Saved" : `Saved, but the folder is not usable: ${check.message}`,
+  };
+}
+
+export interface InspectResult extends ActionResult {
+  report?: LibraryReport;
+}
+
+/** Reads an existing library and proposes templates that match it. */
+export async function analyseLibrary(
+  kind: MediaKind,
+  libraryDir: string,
+): Promise<InspectResult> {
+  try {
+    const report = await inspectLibrary(kind, libraryDir);
+    if (report.problem) return { ok: false, message: report.problem, report };
+    return { ok: true, message: report.summary, report };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Could not read that folder",
+    };
+  }
+}
+
+export async function requestImportScan(): Promise<ActionResult> {
+  const config = getConfig(getDb());
+  if (!config.importing.enabled) {
+    return { ok: false, message: "Turn importing on and save before scanning" };
+  }
+  repo.enqueueJob("import_scan");
+  refreshAllViews();
+  return { ok: true, message: "Queued an import scan" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Transmission                                                         */
+/* ------------------------------------------------------------------ */
+
+export async function saveTransmissionSettings(
+  config: TransmissionConfig,
+): Promise<ActionResult> {
+  const parsed = transmissionConfigSchema.safeParse(config);
+  if (!parsed.success) return { ok: false, message: "Those settings are not valid" };
+
+  saveTransmissionConfig(parsed.data);
+  refreshAllViews();
+  return { ok: true, message: "Saved" };
+}
+
+export async function testTransmission(config: TransmissionConfig): Promise<ActionResult> {
+  try {
+    const status = await transmission.testConnection(config);
+    return {
+      ok: true,
+      message:
+        `Connected to Transmission ${status.version} — ${status.total} torrent(s), ` +
+        `${status.completed} finished. Downloads go to ${status.downloadDir || "unknown"}.`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Could not reach Transmission",
+    };
+  }
 }
 
 /** Fetch a feed right now and report what it contains, without grabbing. */

@@ -15,6 +15,7 @@ import os from "node:os";
 import { z } from "zod";
 
 import { getDb, type Db } from "./db";
+import { defaultTemplates } from "./naming";
 import {
   DEFAULT_MOVIE_PROFILE,
   DEFAULT_TV_PROFILE,
@@ -48,6 +49,15 @@ const kindConfigSchema = z.object({
   quality: qualitySchema.default(DEFAULT_TV_PROFILE),
   /** Grab episodes/movies that aired before they were added to the library. */
   grabBacklog: z.boolean().default(false),
+
+  /* Where finished downloads are filed, and under what names. */
+
+  /** Plex library root, e.g. /media/TV. Empty disables importing for this kind. */
+  libraryDir: z.string().default(""),
+  folderTemplate: z.string().default("{title} ({year})"),
+  /** TV only. */
+  seasonTemplate: z.string().default("Season {season:00}"),
+  fileTemplate: z.string().default("{title} ({year})"),
 });
 
 const generalConfigSchema = z.object({
@@ -83,19 +93,68 @@ const plexConfigSchema = z.object({
   syncIntervalMinutes: z.number().int().min(5).max(1440).default(60),
 });
 
+/**
+ * Filing finished downloads into the library.
+ *
+ * Hardlinking is the default because it costs no disk space and leaves the
+ * torrent seeding from the original file; moving breaks seeding, so it has to
+ * be chosen deliberately.
+ */
+const importConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Watched for finished downloads when no torrent client is connected. */
+  watchDir: z.string().default(""),
+  mode: z.enum(["hardlink", "copy", "move"]).default("hardlink"),
+  /** Ignore anything smaller — samples, artwork, stray clips. */
+  minSizeMb: z.number().int().min(0).max(100_000).default(50),
+  /** Minutes between sweeps of the watch folder. */
+  scanIntervalMinutes: z.number().int().min(1).max(1440).default(5),
+});
+
+/** Transmission's RPC endpoint, so tvarr knows when a download finished. */
+const transmissionConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default("http://localhost:9091/transmission/rpc"),
+  username: z.string().default(""),
+  password: z.string().default(""),
+  /**
+   * Transmission reports paths as its own process sees them. When tvarr runs
+   * elsewhere (a container, another host), rewrite that prefix to the local
+   * one — e.g. "/downloads" -> "/mnt/nas/downloads".
+   */
+  remotePathPrefix: z.string().default(""),
+  localPathPrefix: z.string().default(""),
+  /** Only import torrents that finished within this window, on first run. */
+  importExisting: z.boolean().default(false),
+});
+
 export type KindConfig = z.infer<typeof kindConfigSchema>;
 export type GeneralConfig = z.infer<typeof generalConfigSchema>;
 export type PlexConfig = z.infer<typeof plexConfigSchema>;
+export type ImportConfig = z.infer<typeof importConfigSchema>;
+export type TransmissionConfig = z.infer<typeof transmissionConfigSchema>;
 
 export interface AppConfig {
   tv: KindConfig;
   movies: KindConfig;
   general: GeneralConfig;
   plex: PlexConfig;
+  importing: ImportConfig;
+  transmission: TransmissionConfig;
 }
 
 function defaultDownloadDir(kind: MediaKind): string {
   return path.join(os.homedir(), "Downloads", "tvarr", kind === "tv" ? "tv" : "movies");
+}
+
+/** The standard Plex layout, until a library scan proposes something else. */
+function defaultTemplateFields(kind: MediaKind) {
+  const templates = defaultTemplates(kind);
+  return {
+    folderTemplate: templates.folder,
+    seasonTemplate: templates.season,
+    fileTemplate: templates.file,
+  };
 }
 
 export function defaultConfig(): AppConfig {
@@ -105,15 +164,21 @@ export function defaultConfig(): AppConfig {
       createFolders: true,
       quality: DEFAULT_TV_PROFILE,
       grabBacklog: false,
+      libraryDir: "",
+      ...defaultTemplateFields("tv"),
     },
     movies: {
       downloadDir: defaultDownloadDir("movie"),
       createFolders: false,
       quality: DEFAULT_MOVIE_PROFILE,
       grabBacklog: true,
+      libraryDir: "",
+      ...defaultTemplateFields("movie"),
     },
     general: generalConfigSchema.parse({}),
     plex: plexConfigSchema.parse({}),
+    importing: importConfigSchema.parse({}),
+    transmission: transmissionConfigSchema.parse({}),
   };
 }
 
@@ -144,11 +209,26 @@ export function getConfig(db: Db = getDb()): AppConfig {
     movies: readSection(db, "movies", kindConfigSchema, defaults.movies),
     general: readSection(db, "general", generalConfigSchema, defaults.general),
     plex: readSection(db, "plex", plexConfigSchema, defaults.plex),
+    importing: readSection(db, "importing", importConfigSchema, defaults.importing),
+    transmission: readSection(
+      db,
+      "transmission",
+      transmissionConfigSchema,
+      defaults.transmission,
+    ),
   };
 }
 
 export function savePlexConfig(value: PlexConfig, db: Db = getDb()): void {
   writeSection(db, "plex", plexConfigSchema.parse(value));
+}
+
+export function saveImportConfig(value: ImportConfig, db: Db = getDb()): void {
+  writeSection(db, "importing", importConfigSchema.parse(value));
+}
+
+export function saveTransmissionConfig(value: TransmissionConfig, db: Db = getDb()): void {
+  writeSection(db, "transmission", transmissionConfigSchema.parse(value));
 }
 
 /** Config for one library, chosen by kind. */
@@ -174,7 +254,14 @@ export function parseQualityProfile(input: unknown): QualityProfile {
   return parsed.success ? parsed.data : { ...DEFAULT_TV_PROFILE };
 }
 
-export { qualitySchema, kindConfigSchema, generalConfigSchema, plexConfigSchema };
+export {
+  qualitySchema,
+  kindConfigSchema,
+  generalConfigSchema,
+  plexConfigSchema,
+  importConfigSchema,
+  transmissionConfigSchema,
+};
 
 /* ------------------------------------------------------------------ */
 /* Plex sync state                                                      */

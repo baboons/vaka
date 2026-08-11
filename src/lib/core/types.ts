@@ -237,7 +237,8 @@ export type JobType =
   | "refresh_all"
   | "search_media"
   | "grab_item"
-  | "sync_plex";
+  | "sync_plex"
+  | "import_scan";
 
 export type JobState = "pending" | "running" | "done" | "failed";
 

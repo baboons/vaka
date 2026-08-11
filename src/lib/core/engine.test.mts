@@ -94,12 +94,14 @@ before(async () => {
 
   const db = getDb();
   settings.saveKindConfig("tv", {
+    ...settings.defaultConfig().tv,
     downloadDir: tvDir,
     createFolders: true,
     quality: { ...DEFAULT_TV_PROFILE, allowed: ["720p", "1080p"], preferred: "1080p" },
     grabBacklog: true,
   });
   settings.saveKindConfig("movie", {
+    ...settings.defaultConfig().movies,
     downloadDir: movieDir,
     createFolders: false,
     quality: {

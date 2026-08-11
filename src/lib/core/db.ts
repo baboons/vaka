@@ -146,6 +146,21 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+-- One row per download that has been filed into the library, so a torrent
+-- that keeps seeding is not imported again on every scan.
+CREATE TABLE IF NOT EXISTS imports (
+  id         INTEGER PRIMARY KEY,
+  source_key TEXT    NOT NULL UNIQUE,
+  name       TEXT,
+  path       TEXT,
+  file_count INTEGER NOT NULL DEFAULT 0,
+  status     TEXT    NOT NULL,
+  detail     TEXT,
+  created_at TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_imports_created ON imports (created_at DESC);
+
 -- Responses from metadata providers, so the dashboard does not re-fetch
 -- discovery lists on every render. Expired rows are kept, not deleted: a
 -- stale list beats an empty one when a provider is down.

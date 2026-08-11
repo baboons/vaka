@@ -1,10 +1,20 @@
 import path from "node:path";
 
-import { Clapperboard, Library, Rss, SlidersHorizontal, Terminal, Tv } from "lucide-react";
+import {
+  Clapperboard,
+  FolderInput,
+  Library,
+  Rss,
+  SlidersHorizontal,
+  Terminal,
+  Tv,
+} from "lucide-react";
 
 import { PageHeader, Pill } from "@/components/bits";
 import { FeedManager } from "@/components/feed-manager";
 import { GeneralSettingsForm } from "@/components/general-settings-form";
+import { ImportSettingsForm } from "@/components/import-settings-form";
+import { LibraryNamingForm } from "@/components/library-naming-form";
 import { LibrarySettingsForm } from "@/components/library-settings-form";
 import { PlexSettingsForm } from "@/components/plex-settings-form";
 import { RelativeTime } from "@/components/relative-time";
@@ -27,6 +37,7 @@ export default function SettingsPage() {
   const config = getConfig(db);
   const feeds = repo.listFeeds(false, db);
   const plexState = getPlexState(db);
+  const recentImports = repo.listImports(20, db);
   const worker = getWorkerState(db);
   const online = isWorkerOnline(worker);
 
@@ -53,6 +64,10 @@ export default function SettingsPage() {
               <Clapperboard className="size-3.5" />
               Movies
             </TabsTrigger>
+            <TabsTrigger value="import">
+              <FolderInput className="size-3.5" />
+              Import
+            </TabsTrigger>
             <TabsTrigger value="plex">
               <Library className="size-3.5" />
               Plex
@@ -77,15 +92,45 @@ export default function SettingsPage() {
               <FeedManager feeds={feeds} />
             </TabsContent>
 
-            <TabsContent value="tv">
+            <TabsContent value="tv" className="space-y-5">
               <div className="panel p-5">
                 <LibrarySettingsForm kind="tv" initial={config.tv} />
               </div>
+              <div className="panel p-5">
+                <h3 className="mb-1 text-[14px] font-semibold">Where finished episodes go</h3>
+                <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
+                  Used when importing is on. Season folders are created as needed.
+                </p>
+                <LibraryNamingForm kind="tv" initial={config.tv} />
+              </div>
             </TabsContent>
 
-            <TabsContent value="movies">
+            <TabsContent value="movies" className="space-y-5">
               <div className="panel p-5">
                 <LibrarySettingsForm kind="movie" initial={config.movies} />
+              </div>
+              <div className="panel p-5">
+                <h3 className="mb-1 text-[14px] font-semibold">Where finished films go</h3>
+                <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
+                  Used when importing is on. Plex expects one folder per film.
+                </p>
+                <LibraryNamingForm kind="movie" initial={config.movies} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="import">
+              <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
+                tvarr can file finished downloads into your Plex library — renaming them, and
+                creating <span className="mono">Season 01</span> folders where they are missing.
+                Set the destination and naming under <span className="text-foreground/80">TV</span>{" "}
+                and <span className="text-foreground/80">Movies</span>.
+              </p>
+              <div className="panel p-5">
+                <ImportSettingsForm
+                  initial={config.importing}
+                  transmission={config.transmission}
+                  recent={recentImports}
+                />
               </div>
             </TabsContent>
 

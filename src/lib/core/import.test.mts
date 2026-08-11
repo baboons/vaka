@@ -1,0 +1,300 @@
+/**
+ * Importing finished downloads into a Plex-shaped library.
+ *
+ * This is the only code in tvarr that touches files the user already had, so
+ * the safety properties matter as much as the happy path: never overwrite,
+ * never destroy the source when hardlinking, never write outside the library.
+ */
+
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test, { after, before, beforeEach } from "node:test";
+
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-import-"));
+process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+
+const { getDb, closeDb } = await import("./db");
+const { importPath, planImport, runImport } = await import("./import");
+const naming = await import("./naming");
+const repo = await import("./repo");
+const settings = await import("./settings");
+const { DEFAULT_MOVIE_PROFILE, DEFAULT_TV_PROFILE } = await import("./types");
+
+const downloads = path.join(tempRoot, "downloads");
+const tvLibrary = path.join(tempRoot, "library", "TV");
+const movieLibrary = path.join(tempRoot, "library", "Movies");
+
+/** Big enough to clear the minimum-size filter. */
+const BIG = 60 * 1024 * 1024;
+
+async function makeFile(target: string, size = BIG): Promise<void> {
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, Buffer.alloc(size, 1));
+}
+
+function configure(mode: "hardlink" | "copy" | "move") {
+  const defaults = settings.defaultConfig();
+  settings.saveKindConfig("tv", { ...defaults.tv, libraryDir: tvLibrary });
+  settings.saveKindConfig("movie", { ...defaults.movies, libraryDir: movieLibrary });
+  settings.saveImportConfig({
+    enabled: true,
+    watchDir: downloads,
+    mode,
+    minSizeMb: 50,
+    scanIntervalMinutes: 5,
+  });
+}
+
+before(async () => {
+  const db = getDb();
+  configure("hardlink");
+
+  const show = repo.insertMedia(
+    {
+      kind: "tv",
+      provider: "tvmaze",
+      providerId: "1",
+      title: "The Bear",
+      year: 2022,
+      quality: DEFAULT_TV_PROFILE,
+    },
+    db,
+  );
+  repo.upsertEpisodes(
+    [
+      { mediaId: show.id, season: 3, number: 1, title: "Tomorrow", monitored: true },
+      { mediaId: show.id, season: 3, number: 2, title: "Next", monitored: true },
+      { mediaId: show.id, season: 10, number: 1, title: "Double", monitored: true },
+      { mediaId: show.id, season: 10, number: 2, title: "Trouble", monitored: true },
+    ],
+    db,
+  );
+
+  repo.insertMedia(
+    {
+      kind: "movie",
+      provider: "cinemeta",
+      providerId: "tt15239678",
+      title: "Dune Part Two",
+      year: 2024,
+      quality: DEFAULT_MOVIE_PROFILE,
+    },
+    db,
+  );
+});
+
+beforeEach(() => configure("hardlink"));
+
+after(async () => {
+  closeDb();
+  await fs.rm(tempRoot, { recursive: true, force: true });
+});
+
+test("renders Plex templates, padding seasons and episodes", () => {
+  const templates = naming.defaultTemplates("tv");
+  const destination = naming.buildDestination({
+    kind: "tv",
+    libraryDir: "/library/TV",
+    templates,
+    extension: ".mkv",
+    values: { title: "The Bear", year: 2022, season: 3, episode: 1, episodeTitle: "Tomorrow" },
+  });
+
+  assert.equal(
+    destination.relative,
+    path.join("The Bear (2022)", "Season 03", "The Bear (2022) - S03E01 - Tomorrow.mkv"),
+  );
+});
+
+test("collapses tokens that have no value instead of leaving empty brackets", () => {
+  const rendered = naming.renderTemplate("{title} ({year})", { title: "Untitled", year: null });
+  assert.equal(rendered, "Untitled");
+});
+
+test("renders multi-episode files as a range", () => {
+  const rendered = naming.renderTemplate("S{season:00}E{episode:00}", {
+    title: "x",
+    season: 1,
+    episode: 1,
+    episodeEnd: 2,
+  });
+  assert.equal(rendered, "S01E01-E02");
+});
+
+test("strips path separators so a release name cannot escape its folder", () => {
+  // Asserted as properties rather than exact strings: what matters is that
+  // nothing survives that could traverse or hide.
+  for (const nasty of ["../../etc/passwd", "a/b", "..\\..\\windows", ".hidden", "  ..  "]) {
+    const safe = naming.sanitizeSegment(nasty);
+    assert.ok(!safe.includes("/"), `${safe} still contains a slash`);
+    assert.ok(!safe.includes("\\"), `${safe} still contains a backslash`);
+    assert.ok(!safe.startsWith("."), `${safe} would be a hidden file`);
+    assert.ok(safe.length > 0);
+  }
+
+  assert.equal(naming.sanitizeSegment("a/b"), "a - b");
+  assert.equal(naming.sanitizeSegment("   "), "Unknown");
+  // Ordinary titles must survive intact.
+  assert.equal(naming.sanitizeSegment("Mission: Impossible - Fallout"), "Mission Impossible - Fallout");
+  assert.equal(naming.sanitizeSegment("WALL·E"), "WALL·E");
+});
+
+test("files an episode into Season NN, creating the folders", async () => {
+  const source = path.join(downloads, "The.Bear.S03E01.1080p.WEB-DL.x264-NTb.mkv");
+  await makeFile(source);
+
+  const outcome = await importPath(source, getDb(), { releaseName: path.basename(source) });
+  assert.equal(outcome.imported.length, 1);
+
+  const expected = path.join(
+    tvLibrary,
+    "The Bear (2022)",
+    "Season 03",
+    "The Bear (2022) - S03E01 - Tomorrow.mkv",
+  );
+  const stat = await fs.stat(expected);
+  assert.ok(stat.isFile());
+  assert.equal(stat.size, BIG);
+});
+
+test("hardlinks rather than copying, so seeding continues and no space is used", async () => {
+  const source = path.join(downloads, "The.Bear.S03E02.1080p.WEB-DL.x264-NTb.mkv");
+  await makeFile(source);
+
+  await importPath(source, getDb(), { releaseName: path.basename(source) });
+
+  const target = path.join(
+    tvLibrary,
+    "The Bear (2022)",
+    "Season 03",
+    "The Bear (2022) - S03E02 - Next.mkv",
+  );
+
+  const [from, to] = await Promise.all([fs.stat(source), fs.stat(target)]);
+  assert.equal(from.ino, to.ino, "the library file should be the same inode as the download");
+  assert.ok(await fs.stat(source), "the download must still exist for seeding");
+});
+
+test("marks the episode as had, so the watcher stops wanting it", () => {
+  const show = repo.listMedia({ kind: "tv" })[0];
+  const episodes = repo.listEpisodes(show.id);
+  assert.equal(episodes.find((e) => e.number === 1 && e.season === 3)?.state, "done");
+  assert.equal(episodes.find((e) => e.number === 2 && e.season === 3)?.state, "done");
+});
+
+test("puts a film in its own folder", async () => {
+  const source = path.join(downloads, "Dune.Part.Two.2024.2160p.WEB-DL.H.265-FLUX.mkv");
+  await makeFile(source);
+
+  await importPath(source, getDb(), { releaseName: path.basename(source) });
+
+  const expected = path.join(movieLibrary, "Dune Part Two (2024)", "Dune Part Two (2024).mkv");
+  assert.ok((await fs.stat(expected)).isFile());
+  assert.equal(repo.listMedia({ kind: "movie" })[0].state, "done");
+});
+
+test("takes the episode from a folder-style download and ignores the sample", async () => {
+  const folder = path.join(downloads, "The.Bear.S10E01.1080p.WEB-DL.x264-NTb");
+  await makeFile(path.join(folder, "the.bear.s10e01.1080p.web-dl.x264-ntb.mkv"));
+  await makeFile(path.join(folder, "Sample", "sample.mkv"), 2 * 1024 * 1024);
+  await fs.writeFile(path.join(folder, "readme.nfo"), "notes");
+
+  const outcome = await importPath(folder, getDb(), { releaseName: path.basename(folder) });
+
+  assert.equal(outcome.imported.length, 1, "only the feature file should be imported");
+  const expected = path.join(
+    tvLibrary,
+    "The Bear (2022)",
+    "Season 10",
+    "The Bear (2022) - S10E01 - Double.mkv",
+  );
+  assert.ok((await fs.stat(expected)).isFile());
+});
+
+test("carries matching subtitles across with the video", async () => {
+  const base = path.join(downloads, "The.Bear.S10E02.1080p.WEB-DL.x264-NTb");
+  await makeFile(`${base}.mkv`);
+  await fs.writeFile(`${base}.srt`, "1\n00:00:01,000 --> 00:00:02,000\nhello\n");
+
+  await importPath(`${base}.mkv`, getDb(), { releaseName: path.basename(base) });
+
+  const subtitle = path.join(
+    tvLibrary,
+    "The Bear (2022)",
+    "Season 10",
+    "The Bear (2022) - S10E02 - Trouble.srt",
+  );
+  assert.ok((await fs.stat(subtitle)).isFile());
+});
+
+test("never overwrites: a second copy lands beside the first", async () => {
+  const source = path.join(downloads, "second", "The.Bear.S03E01.2160p.WEB-DL.x265-NTb.mkv");
+  await makeFile(source);
+
+  await importPath(source, getDb(), { releaseName: path.basename(source) });
+
+  const seasonDir = path.join(tvLibrary, "The Bear (2022)", "Season 03");
+  const files = (await fs.readdir(seasonDir)).filter((name) => name.endsWith(".mkv")).sort();
+
+  assert.deepEqual(files, [
+    "The Bear (2022) - S03E01 - Tomorrow (1).mkv",
+    "The Bear (2022) - S03E01 - Tomorrow.mkv",
+    "The Bear (2022) - S03E02 - Next.mkv",
+  ]);
+});
+
+test("skips files that match nothing in the library, leaving them alone", async () => {
+  const source = path.join(downloads, "Some.Unfollowed.Show.S01E01.1080p.WEB-DL.mkv");
+  await makeFile(source);
+
+  const outcome = await importPath(source, getDb(), { releaseName: path.basename(source) });
+
+  assert.equal(outcome.imported.length, 0);
+  assert.match(outcome.skipped[0]?.reason ?? "", /no followed title matches/);
+  assert.ok(await fs.stat(source), "an unmatched download must be left untouched");
+});
+
+test("a dry run reports the plan and writes nothing", async () => {
+  const source = path.join(downloads, "dry", "The.Bear.S03E02.2160p.WEB-DL.x265-NTb.mkv");
+  await makeFile(source);
+
+  const before = await fs.readdir(path.join(tvLibrary, "The Bear (2022)", "Season 03"));
+  const plan = await planImport(source, getDb(), { releaseName: path.basename(source) });
+  const outcome = await runImport(plan, getDb(), { dryRun: true });
+
+  assert.equal(outcome.imported.length, 1);
+  assert.match(outcome.imported[0].relative, /Season 03/);
+
+  const after = await fs.readdir(path.join(tvLibrary, "The Bear (2022)", "Season 03"));
+  assert.deepEqual(after, before, "a dry run must not change the library");
+});
+
+test("move mode relocates the file instead of linking it", async () => {
+  configure("move");
+  const source = path.join(downloads, "moved", "The.Bear.S10E02.720p.HDTV.x264-GRP.mkv");
+  await makeFile(source);
+
+  await importPath(source, getDb(), { releaseName: path.basename(source) });
+
+  await assert.rejects(() => fs.stat(source), "the source should be gone after a move");
+});
+
+test("respects a library that names seasons differently", async () => {
+  const defaults = settings.defaultConfig();
+  settings.saveKindConfig("tv", {
+    ...defaults.tv,
+    libraryDir: tvLibrary,
+    seasonTemplate: "Season {season}",
+    folderTemplate: "{title}",
+    fileTemplate: "{title} - S{season:00}E{episode:00}",
+  });
+
+  const source = path.join(downloads, "custom", "The.Bear.S10E01.720p.HDTV.x264-GRP.mkv");
+  await makeFile(source);
+  await importPath(source, getDb(), { releaseName: path.basename(source) });
+
+  const expected = path.join(tvLibrary, "The Bear", "Season 10", "The Bear - S10E01.mkv");
+  assert.ok((await fs.stat(expected)).isFile());
+});

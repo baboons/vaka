@@ -20,6 +20,7 @@ import {
   refreshMedia,
   searchForMedia,
 } from "../lib/core/engine";
+import { describeScan, scanAll } from "../lib/core/import-runner";
 import { syncPlexSafely } from "../lib/core/plex";
 import * as repo from "../lib/core/repo";
 import { getConfig, getWorkerState, isWorkerOnline, saveWorkerState } from "../lib/core/settings";
@@ -60,6 +61,7 @@ let nextRefreshAt = 0;
 let nextHeartbeatAt = 0;
 let nextMaintenanceAt = 0;
 let nextPlexSyncAt = 0;
+let nextImportAt = 0;
 
 async function runPoll(reason: string): Promise<void> {
   const db = getDb();
@@ -140,6 +142,13 @@ async function runJob(job: Job): Promise<string> {
       log("ok", `plex: ${result.message}`);
       return result.message;
     }
+    case "import_scan": {
+      const summary = await scanAll(db);
+      for (const error of summary.errors) log("error", `import: ${error}`);
+      const message = describeScan(summary);
+      if (summary.files > 0) log("ok", `import: ${message}`);
+      return message;
+    }
     default:
       throw new Error(`unknown job type: ${job.type}`);
   }
@@ -208,6 +217,19 @@ async function tick(): Promise<void> {
       }
     }
     nextRefreshAt = now + interval;
+  }
+
+  // Importing runs on its own, faster cadence: a download finishing has
+  // nothing to do with when the feeds are next due.
+  if (config.importing.enabled && now >= nextImportAt) {
+    nextImportAt = now + config.importing.scanIntervalMinutes * 60_000;
+    try {
+      const summary = await scanAll(db);
+      for (const error of summary.errors) log("error", `import: ${error}`);
+      if (summary.files > 0) log("ok", `import: ${describeScan(summary)}`);
+    } catch (error) {
+      log("error", `import scan failed: ${String(error)}`);
+    }
   }
 
   if (now >= nextMaintenanceAt) {

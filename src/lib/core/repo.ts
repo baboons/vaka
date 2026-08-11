@@ -787,6 +787,83 @@ export function hasGrabbed(guid: string, db: Db = getDb()): boolean {
 }
 
 /* ------------------------------------------------------------------ */
+/* Imports                                                              */
+/* ------------------------------------------------------------------ */
+
+export interface ImportRecord {
+  id: number;
+  sourceKey: string;
+  name: string | null;
+  path: string | null;
+  fileCount: number;
+  status: string;
+  detail: string | null;
+  createdAt: string;
+}
+
+function mapImport(row: Row): ImportRecord {
+  return {
+    id: row.id as number,
+    sourceKey: row.source_key as string,
+    name: (row.name as string) ?? null,
+    path: (row.path as string) ?? null,
+    fileCount: (row.file_count as number) ?? 0,
+    status: row.status as string,
+    detail: (row.detail as string) ?? null,
+    createdAt: row.created_at as string,
+  };
+}
+
+/** Keyed by torrent hash, or by path for folder scans. */
+export function wasImported(sourceKey: string, db: Db = getDb()): boolean {
+  const row = db
+    .prepare("SELECT 1 AS hit FROM imports WHERE source_key = ? LIMIT 1")
+    .get(sourceKey) as Row | undefined;
+  return Boolean(row);
+}
+
+export function recordImport(
+  entry: {
+    sourceKey: string;
+    name?: string | null;
+    path?: string | null;
+    fileCount?: number;
+    status: "done" | "failed" | "skipped";
+    detail?: string | null;
+  },
+  db: Db = getDb(),
+): void {
+  db.prepare(
+    `INSERT INTO imports (source_key, name, path, file_count, status, detail, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(source_key) DO UPDATE SET
+       file_count = excluded.file_count,
+       status     = excluded.status,
+       detail     = excluded.detail`,
+  ).run(
+    entry.sourceKey,
+    entry.name ?? null,
+    entry.path ?? null,
+    entry.fileCount ?? 0,
+    entry.status,
+    entry.detail ?? null,
+    nowIso(),
+  );
+}
+
+export function listImports(limit = 50, db: Db = getDb()): ImportRecord[] {
+  const rows = db
+    .prepare("SELECT * FROM imports ORDER BY created_at DESC, id DESC LIMIT ?")
+    .all(limit) as Row[];
+  return rows.map(mapImport);
+}
+
+/** Lets a failed import be retried on the next scan. */
+export function forgetImport(sourceKey: string, db: Db = getDb()): void {
+  db.prepare("DELETE FROM imports WHERE source_key = ?").run(sourceKey);
+}
+
+/* ------------------------------------------------------------------ */
 /* Jobs                                                                 */
 /* ------------------------------------------------------------------ */
 
