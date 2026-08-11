@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "PORT=${PORT:-4000} next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "PORT=${PORT:-4000} next start",
     "watch": "tsx src/worker/main.ts",
     "watch:dev": "tsx watch src/worker/main.ts",
     "update": "node scripts/update.mjs",

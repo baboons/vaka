@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /**
- * Manages the tvarr watcher as a background service.
+ * Manages tvarr as a background service.
  *
- *   node scripts/service.mjs install     write the unit file and (re)start
- *   node scripts/service.mjs restart     restart the running watcher
+ *   node scripts/service.mjs install     write the unit files and (re)start
+ *   node scripts/service.mjs restart     restart both processes
  *   node scripts/service.mjs start|stop
  *   node scripts/service.mjs status      service state plus the watcher heartbeat
- *   node scripts/service.mjs logs        follow the log
- *   node scripts/service.mjs print       show the unit file, change nothing
+ *   node scripts/service.mjs logs        follow both logs
+ *   node scripts/service.mjs print       show the unit files, change nothing
  *   node scripts/service.mjs uninstall
  *
- * Uses a per-user service (systemd user unit on Linux, launchd LaunchAgent on
- * macOS) rather than a system one: the watcher writes into your home directory
- * and must run as you, not as root.
+ * Two units are installed, not one: the watcher and the web interface fail for
+ * different reasons and are supervised independently, so a crashed UI never
+ * stops downloads and restarting one does not disturb the other.
+ *
+ * Per-user services (systemd user units on Linux, launchd LaunchAgents on
+ * macOS) rather than system ones: tvarr writes into your home directory and
+ * must run as you, not as root.
  */
 
 import { spawnSync } from "node:child_process";
@@ -23,43 +27,67 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 const dataDir = process.env.TVARR_DATA_DIR
   ? path.resolve(process.env.TVARR_DATA_DIR)
   : path.join(os.homedir(), ".tvarr");
 
-const LABEL = "dev.tvarr.watcher";
-const SERVICE_NAME = "tvarr-watcher";
+/** Baked into the unit at install time; override with PORT=… when installing. */
+const port = process.env.PORT?.trim() || "4000";
 
 const nodeBin = process.execPath;
 const tsxCli = path.join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
-const entry = path.join(projectRoot, "src", "worker", "main.ts");
-
-const logFile = path.join(dataDir, "watcher.log");
-const errorLogFile = path.join(dataDir, "watcher.error.log");
+const watcherEntry = path.join(projectRoot, "src", "worker", "main.ts");
+const nextCli = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
 
 const isMac = process.platform === "darwin";
 const isLinux = process.platform === "linux";
 
-const plistPath = path.join(os.homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
-const unitPath = path.join(
-  os.homedir(),
-  ".config",
-  "systemd",
-  "user",
-  `${SERVICE_NAME}.service`,
-);
-const servicePath = isMac ? plistPath : unitPath;
+const SERVICES = [
+  {
+    key: "watcher",
+    unit: "tvarr-watcher",
+    label: "dev.tvarr.watcher",
+    title: "Watcher",
+    description: "tvarr release watcher",
+    exec: () => [nodeBin, tsxCli, watcherEntry],
+    env: () => ({ NO_COLOR: "1", TVARR_DATA_DIR: dataDir }),
+  },
+  {
+    key: "web",
+    unit: "tvarr-web",
+    label: "dev.tvarr.web",
+    title: "Web interface",
+    description: "tvarr web interface",
+    exec: () => [nodeBin, nextCli, "start"],
+    env: () => ({
+      NO_COLOR: "1",
+      TVARR_DATA_DIR: dataDir,
+      PORT: port,
+      NODE_ENV: "production",
+    }),
+  },
+];
+
+function servicePath(service) {
+  return isMac
+    ? path.join(os.homedir(), "Library", "LaunchAgents", `${service.label}.plist`)
+    : path.join(os.homedir(), ".config", "systemd", "user", `${service.unit}.service`);
+}
+
+function logPath(service) {
+  return path.join(dataDir, `${service.key}.log`);
+}
+
+function errorLogPath(service) {
+  return path.join(dataDir, `${service.key}.error.log`);
+}
 
 function fail(message) {
   console.error(`\n  ${message}\n`);
   process.exit(1);
 }
 
-function info(message) {
-  console.log(message);
-}
-
-/** Run a command, inheriting stdio. Returns true when it exited cleanly. */
 function run(command, args, { quiet = false } = {}) {
   const result = spawnSync(command, args, { stdio: quiet ? "ignore" : "inherit" });
   return result.status === 0;
@@ -72,72 +100,75 @@ function capture(command, args) {
 
 function requireSupportedPlatform() {
   if (!isMac && !isLinux) {
-    fail(`Unsupported platform "${process.platform}". Run the watcher with \`pnpm watch\`.`);
+    fail(`Unsupported platform "${process.platform}". Run \`pnpm watch\` and \`pnpm start\`.`);
   }
   if (isLinux && !capture("sh", ["-c", "command -v systemctl"])) {
     fail(
-      "systemctl was not found. Without systemd, run the watcher under your own\n" +
-        "  process manager, pointing it at:\n\n" +
-        `    ${nodeBin} ${tsxCli} ${entry}`,
+      "systemctl was not found. Without systemd, supervise these two commands\n" +
+        "  yourself:\n\n" +
+        SERVICES.map((s) => `    ${s.exec().join(" ")}`).join("\n"),
     );
   }
 }
 
 export function isInstalled() {
-  return fs.existsSync(servicePath);
+  return SERVICES.some((service) => fs.existsSync(servicePath(service)));
 }
 
 /* ------------------------------------------------------------------ */
 /* Unit files                                                           */
 /* ------------------------------------------------------------------ */
 
-function launchdPlist() {
+function launchdPlist(service) {
+  const env = service.env();
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>${LABEL}</string>
+  <string>${service.label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${nodeBin}</string>
-    <string>${tsxCli}</string>
-    <string>${entry}</string>
+${service
+  .exec()
+  .map((argument) => `    <string>${argument}</string>`)
+  .join("\n")}
   </array>
   <key>WorkingDirectory</key>
   <string>${projectRoot}</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>NO_COLOR</key>
-    <string>1</string>
-    <key>TVARR_DATA_DIR</key>
-    <string>${dataDir}</string>
+${Object.entries(env)
+  .map(([key, value]) => `    <key>${key}</key>\n    <string>${value}</string>`)
+  .join("\n")}
   </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>${logFile}</string>
+  <string>${logPath(service)}</string>
   <key>StandardErrorPath</key>
-  <string>${errorLogFile}</string>
+  <string>${errorLogPath(service)}</string>
 </dict>
 </plist>
 `;
 }
 
-function systemdUnit() {
+function systemdUnit(service) {
+  const env = service.env();
   return `[Unit]
-Description=tvarr release watcher
+Description=${service.description}
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=${projectRoot}
-Environment=NO_COLOR=1
-Environment=TVARR_DATA_DIR=${dataDir}
-ExecStart=${nodeBin} ${tsxCli} ${entry}
+${Object.entries(env)
+  .map(([key, value]) => `Environment=${key}=${value}`)
+  .join("\n")}
+ExecStart=${service.exec().join(" ")}
 Restart=always
 RestartSec=10
 
@@ -146,50 +177,73 @@ WantedBy=default.target
 `;
 }
 
-function unitContents() {
-  return isMac ? launchdPlist() : systemdUnit();
+function unitContents(service) {
+  return isMac ? launchdPlist(service) : systemdUnit(service);
 }
 
 /* ------------------------------------------------------------------ */
 /* Commands                                                             */
 /* ------------------------------------------------------------------ */
 
+function installOne(service) {
+  const target = servicePath(service);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, unitContents(service));
+
+  if (isMac) {
+    // Rewriting the plist is not enough; the old job must be torn down for
+    // changed paths or a changed port to take effect.
+    run("launchctl", ["bootout", `gui/${process.getuid()}/${service.label}`], { quiet: true });
+    return run("launchctl", ["bootstrap", `gui/${process.getuid()}`, target]);
+  }
+
+  run("systemctl", ["--user", "enable", service.unit], { quiet: true });
+  // restart rather than start, so re-running install picks up new code.
+  return run("systemctl", ["--user", "restart", service.unit]);
+}
+
 function install() {
   requireSupportedPlatform();
   if (!fs.existsSync(tsxCli)) fail("Could not find tsx — run `pnpm install` first.");
+  if (!fs.existsSync(nextCli)) fail("Could not find next — run `pnpm install` first.");
 
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.mkdirSync(path.dirname(servicePath), { recursive: true });
-  fs.writeFileSync(servicePath, unitContents());
-
-  if (isMac) {
-    // Rewriting the plist is not enough; the old job has to be torn down so
-    // the new paths take effect.
-    run("launchctl", ["bootout", `gui/${process.getuid()}/${LABEL}`], { quiet: true });
-    if (!run("launchctl", ["bootstrap", `gui/${process.getuid()}`, servicePath])) {
-      fail("launchctl could not start the service. Check the log at " + logFile);
-    }
-  } else {
-    run("systemctl", ["--user", "daemon-reload"]);
-    run("systemctl", ["--user", "enable", SERVICE_NAME], { quiet: true });
-    // restart rather than start, so re-running this picks up new code.
-    if (!run("systemctl", ["--user", "restart", SERVICE_NAME])) {
-      fail(`systemctl could not start the service. Try: journalctl --user -u ${SERVICE_NAME} -n 50`);
-    }
+  const built = fs.existsSync(path.join(projectRoot, ".next", "BUILD_ID"));
+  if (!built) {
+    fail("No production build found. Run `pnpm build` first, then install the service.");
   }
 
-  info(`
-  The tvarr watcher is installed and running.
+  fs.mkdirSync(dataDir, { recursive: true });
+  if (isLinux) {
+    fs.mkdirSync(path.join(os.homedir(), ".config", "systemd", "user"), { recursive: true });
+    // Units must exist on disk before daemon-reload sees them.
+    for (const service of SERVICES) {
+      fs.writeFileSync(servicePath(service), unitContents(service));
+    }
+    run("systemctl", ["--user", "daemon-reload"]);
+  }
 
-    Unit      ${servicePath}
-    Logs      ${isMac ? logFile : `journalctl --user -u ${SERVICE_NAME} -f`}
-    Restart   pnpm run service:restart
-    Status    pnpm run service:status
-    Remove    pnpm run service:uninstall
+  const failed = SERVICES.filter((service) => !installOne(service));
+  if (failed.length) {
+    fail(
+      `Could not start: ${failed.map((s) => s.unit).join(", ")}.\n` +
+        `  Check \`pnpm run service:logs\` for the reason.`,
+    );
+  }
 
-  It starts at login and restarts if it exits.${
+  console.log(`
+  tvarr is installed and running.
+
+    Web interface   http://localhost:${port}
+    Watcher         downloading in the background
+    Units           ${SERVICES.map((s) => path.basename(servicePath(s))).join("  ")}
+    Logs            pnpm run service:logs
+    Status          pnpm run service:status
+    Restart         pnpm run service:restart
+    Remove          pnpm run service:uninstall
+
+  Both start at login and restart if they exit.${
     isLinux
-      ? `\n\n  To keep it running while you are logged out:\n    sudo loginctl enable-linger ${os.userInfo().username}`
+      ? `\n\n  To keep them running while you are logged out:\n    sudo loginctl enable-linger ${os.userInfo().username}`
       : ""
   }
 `);
@@ -198,37 +252,38 @@ function install() {
 function uninstall() {
   requireSupportedPlatform();
 
-  if (isMac) {
-    run("launchctl", ["bootout", `gui/${process.getuid()}/${LABEL}`], { quiet: true });
-  } else {
-    run("systemctl", ["--user", "disable", "--now", SERVICE_NAME], { quiet: true });
+  for (const service of SERVICES) {
+    if (isMac) {
+      run("launchctl", ["bootout", `gui/${process.getuid()}/${service.label}`], { quiet: true });
+    } else {
+      run("systemctl", ["--user", "disable", "--now", service.unit], { quiet: true });
+    }
+    fs.rmSync(servicePath(service), { force: true });
   }
 
-  fs.rmSync(servicePath, { force: true });
   if (isLinux) run("systemctl", ["--user", "daemon-reload"], { quiet: true });
-
-  info("\n  Removed the tvarr watcher service.\n");
+  console.log("\n  Removed the tvarr services.\n");
 }
 
 function start() {
   requireSupportedPlatform();
   if (!isInstalled()) fail("Not installed. Run `pnpm run service:install` first.");
 
-  const ok = isMac
-    ? run("launchctl", ["bootstrap", `gui/${process.getuid()}`, servicePath])
-    : run("systemctl", ["--user", "start", SERVICE_NAME]);
-
-  info(ok ? "\n  Watcher started.\n" : "\n  Could not start the watcher.\n");
+  for (const service of SERVICES) {
+    if (isMac) run("launchctl", ["bootstrap", `gui/${process.getuid()}`, servicePath(service)]);
+    else run("systemctl", ["--user", "start", service.unit]);
+  }
+  console.log("\n  tvarr started.\n");
 }
 
 function stop() {
   requireSupportedPlatform();
 
-  const ok = isMac
-    ? run("launchctl", ["bootout", `gui/${process.getuid()}/${LABEL}`])
-    : run("systemctl", ["--user", "stop", SERVICE_NAME]);
-
-  info(ok ? "\n  Watcher stopped.\n" : "\n  The watcher was not running.\n");
+  for (const service of SERVICES) {
+    if (isMac) run("launchctl", ["bootout", `gui/${process.getuid()}/${service.label}`], { quiet: true });
+    else run("systemctl", ["--user", "stop", service.unit], { quiet: true });
+  }
+  console.log("\n  tvarr stopped.\n");
 }
 
 export function restart({ silent = false } = {}) {
@@ -236,20 +291,24 @@ export function restart({ silent = false } = {}) {
 
   if (!isInstalled()) {
     if (!silent) {
-      info(
+      console.log(
         "\n  No service is installed, so there is nothing to restart.\n" +
-          "  Install one with `pnpm run service:install`, or run `pnpm watch` yourself.\n",
+          "  Install one with `pnpm run service:install`.\n",
       );
     }
     return false;
   }
 
-  const ok = isMac
-    ? // kickstart -k restarts a running job, and starts it if it is stopped.
-      run("launchctl", ["kickstart", "-k", `gui/${process.getuid()}/${LABEL}`])
-    : run("systemctl", ["--user", "restart", SERVICE_NAME]);
+  let ok = true;
+  for (const service of SERVICES) {
+    const restarted = isMac
+      ? // kickstart -k restarts a running job and starts a stopped one.
+        run("launchctl", ["kickstart", "-k", `gui/${process.getuid()}/${service.label}`])
+      : run("systemctl", ["--user", "restart", service.unit]);
+    if (!restarted) ok = false;
+  }
 
-  if (!silent) info(ok ? "\n  Watcher restarted.\n" : "\n  Could not restart the watcher.\n");
+  if (!silent) console.log(ok ? "\n  tvarr restarted.\n" : "\n  Could not restart every service.\n");
   return ok;
 }
 
@@ -258,7 +317,7 @@ function readHeartbeat() {
   const dbPath = path.join(dataDir, "tvarr.db");
   if (!fs.existsSync(dbPath)) return null;
   try {
-    // Imported lazily: status should still work if deps are mid-install.
+    // Loaded lazily: status should still work if deps are mid-install.
     const require = createRequire(import.meta.url);
     const Database = require("better-sqlite3");
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
@@ -279,56 +338,66 @@ function ago(iso) {
   return `${Math.round(seconds / 3600)}h ago`;
 }
 
+function serviceState(service) {
+  if (!fs.existsSync(servicePath(service))) return "not installed";
+  if (isMac) {
+    const listed = capture("launchctl", ["list", service.label]);
+    const running = listed && /"PID"\s*=\s*(\d+)/.exec(listed);
+    return running ? `running (pid ${running[1]})` : "loaded, not running";
+  }
+  return capture("systemctl", ["--user", "is-active", service.unit]) ?? "inactive";
+}
+
 function status() {
   requireSupportedPlatform();
 
-  info(`\n  Unit file   ${isInstalled() ? servicePath : "not installed"}`);
-  info(`  Data dir    ${dataDir}\n`);
+  console.log(`\n  Data dir    ${dataDir}`);
+  console.log(`  Web         http://localhost:${port}\n`);
 
-  if (isInstalled()) {
-    if (isMac) {
-      const listed = capture("launchctl", ["list", LABEL]);
-      const running = listed && /"PID"\s*=\s*(\d+)/.exec(listed);
-      info(`  launchd     ${running ? `running (pid ${running[1]})` : "loaded, not running"}`);
-    } else {
-      const state = capture("systemctl", ["--user", "is-active", SERVICE_NAME]) ?? "inactive";
-      info(`  systemd     ${state}`);
-    }
+  for (const service of SERVICES) {
+    console.log(`  ${service.title.padEnd(14)}${serviceState(service)}`);
   }
 
   const worker = readHeartbeat();
   if (!worker || !worker.heartbeatAt) {
     // The watcher clears its heartbeat on a clean exit, so a previous
-    // startedAt tells us it ran and stopped rather than never having run.
-    info(
+    // startedAt means it ran and stopped rather than never having run.
+    console.log(
       worker?.startedAt
-        ? `  Heartbeat   stopped cleanly (last ran ${ago(worker.lastPollAt)})\n`
-        : "  Heartbeat   the watcher has never run against this database\n",
+        ? `  Heartbeat     stopped cleanly (last ran ${ago(worker.lastPollAt)})\n`
+        : "  Heartbeat     the watcher has never run against this database\n",
     );
     return;
   }
 
   const stale = Date.now() - new Date(worker.heartbeatAt).getTime() > 90_000;
-  info(`  Heartbeat   ${ago(worker.heartbeatAt)}${stale ? "  (stale — the watcher looks stopped)" : ""}`);
-  info(`  Last check  ${ago(worker.lastPollAt)}`);
-  if (worker.lastError) info(`  Last error  ${worker.lastError}`);
-  info("");
+  console.log(
+    `  Heartbeat     ${ago(worker.heartbeatAt)}${stale ? "  (stale — the watcher looks stuck)" : ""}`,
+  );
+  console.log(`  Last check    ${ago(worker.lastPollAt)}`);
+  if (worker.lastError) console.log(`  Last error    ${worker.lastError}`);
+  console.log("");
 }
 
 function logs() {
   requireSupportedPlatform();
 
   if (isMac) {
-    if (!fs.existsSync(logFile)) fail(`No log yet at ${logFile}`);
-    run("tail", ["-n", "100", "-f", logFile]);
+    const files = SERVICES.flatMap((service) => [logPath(service), errorLogPath(service)]).filter(
+      (file) => fs.existsSync(file),
+    );
+    if (!files.length) fail(`No logs yet under ${dataDir}`);
+    run("tail", ["-n", "50", "-f", ...files]);
   } else {
-    run("journalctl", ["--user", "-u", SERVICE_NAME, "-n", "100", "-f"]);
+    run("journalctl", ["--user", ...SERVICES.flatMap((s) => ["-u", s.unit]), "-n", "100", "-f"]);
   }
 }
 
 function print() {
-  console.log(`\n# ${servicePath}\n`);
-  console.log(unitContents());
+  for (const service of SERVICES) {
+    console.log(`\n# ${servicePath(service)}\n`);
+    console.log(unitContents(service));
+  }
 }
 
 const COMMANDS = { install, uninstall, start, stop, restart, status, logs, print };
@@ -337,8 +406,6 @@ const COMMANDS = { install, uninstall, start, stop, restart, status, logs, print
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   const command = process.argv[2] ?? "install";
   const handler = COMMANDS[command];
-  if (!handler) {
-    fail(`Unknown command "${command}". Try: ${Object.keys(COMMANDS).join(", ")}`);
-  }
+  if (!handler) fail(`Unknown command "${command}". Try: ${Object.keys(COMMANDS).join(", ")}`);
   handler();
 }
