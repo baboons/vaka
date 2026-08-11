@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import { Clapperboard, Tv } from "lucide-react";
 
@@ -7,8 +10,9 @@ import type { MediaKind } from "@/lib/core/types";
 /**
  * Poster art in a fixed 2:3 frame.
  *
- * Providers occasionally return nothing, so the fallback has to look
- * deliberate rather than broken.
+ * Providers hand out URLs that 404 — Cinemeta in particular lists titles whose
+ * artwork has gone — so a failed load falls back to the same placeholder as a
+ * missing URL rather than leaving a broken image icon on the page.
  */
 export function Poster({
   src,
@@ -25,11 +29,12 @@ export function Poster({
   className?: string;
   priority?: boolean;
 }) {
+  const [failed, setFailed] = useState(false);
   const Icon = kind === "tv" ? Tv : Clapperboard;
 
   return (
     <div className={cn("poster-frame", className)}>
-      {src ? (
+      {src && !failed ? (
         <Image
           src={src}
           alt=""
@@ -37,8 +42,7 @@ export function Poster({
           sizes={sizes}
           priority={priority}
           className="object-cover"
-          // Provider art is fetched over the network and may 404 later.
-          unoptimized={false}
+          onError={() => setFailed(true)}
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-b from-surface-high to-surface p-3">

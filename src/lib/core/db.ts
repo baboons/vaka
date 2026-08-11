@@ -145,6 +145,16 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- Responses from metadata providers, so the dashboard does not re-fetch
+-- discovery lists on every render. Expired rows are kept, not deleted: a
+-- stale list beats an empty one when a provider is down.
+CREATE TABLE IF NOT EXISTS cache (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 `;
 
 /**

@@ -128,6 +128,29 @@ up pointing at a version that no longer exists.
 > Use `pnpm run update`. Plain `pnpm update` is pnpm's own dependency updater,
 > which is a different thing entirely.
 
+## Discover
+
+The dashboard suggests things you are not already following, in two views:
+
+- **Popular now** — what people are watching, for TV and film.
+- **Coming soon** — series premiering in the next weeks, with their air date
+  and network, plus upcoming films.
+
+Anything already in your library is filtered out, matched across providers by
+IMDb/TVDB id and falling back to title and year. Every card has a one-click
+follow that opens the usual quality dialog.
+
+Popular TV comes from Cinemeta's IMDb-backed ranking rather than TVmaze's own
+popularity, which ranks by what is airing and therefore surfaces soaps and talk
+shows. Premieres come from the TVmaze schedule. Films come from TMDB when a key
+is configured and Cinemeta otherwise — and because the keyless catalogue only
+lists films that are already out, the movie row under *Coming soon* is honestly
+labelled **New releases** until you add a TMDB key.
+
+Lists are cached (6 hours for popular, 12 for upcoming), so the dashboard's
+auto-refresh costs nothing. If a provider is unreachable the last good list is
+shown and marked as cached rather than disappearing.
+
 ## Feeds
 
 Standard RSS 2.0 and Torznab-style feeds both work. tvarr reads the download

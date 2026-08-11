@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,10 +11,12 @@ import {
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { EmptyState, PageHeader, Pill, SectionTitle, Stat } from "@/components/bits";
+import { DiscoverSection } from "@/components/discover-section";
 import { Poster } from "@/components/poster";
 import { RelativeTime } from "@/components/relative-time";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/lib/core/db";
+import { getDiscoverData, hasMovieCalendar } from "@/lib/core/discover";
 import { pad } from "@/lib/core/engine";
 import * as repo from "@/lib/core/repo";
 import { getConfig } from "@/lib/core/settings";
@@ -186,12 +189,63 @@ export default function DashboardPage() {
           </section>
         </div>
 
+        {/*
+          Streamed: the first render after a cache expiry fetches from TVmaze
+          and Cinemeta, and the rest of the dashboard should not wait for it.
+        */}
+        <Suspense fallback={<DiscoverSkeleton />}>
+          <Discover />
+        </Suspense>
+
         <section className="grid gap-3 sm:grid-cols-2">
           <FolderCard label="TV downloads" path={config.tv.downloadDir} />
           <FolderCard label="Movie downloads" path={config.movies.downloadDir} />
         </section>
       </div>
     </>
+  );
+}
+
+/** Popular and upcoming titles you are not already following. */
+async function Discover() {
+  const db = getDb();
+  const config = getConfig(db);
+  const data = await getDiscoverData(db);
+
+  return (
+    <DiscoverSection
+      popular={data.popular}
+      upcoming={data.upcoming}
+      tvQuality={config.tv.quality}
+      movieQuality={config.movies.quality}
+      hasMovieCalendar={hasMovieCalendar(db)}
+    />
+  );
+}
+
+function DiscoverSkeleton() {
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="label-mono text-foreground/70">Discover</h2>
+      </div>
+      <div className="space-y-5">
+        {[0, 1].map((row) => (
+          <div key={row}>
+            <div className="mb-2.5 h-3 w-24 rounded bg-secondary/60" />
+            <div className="flex gap-3 overflow-hidden">
+              {Array.from({ length: 8 }, (_, index) => (
+                <div key={index} className="w-[132px] shrink-0 animate-pulse">
+                  <div className="poster-frame mb-2" />
+                  <div className="h-3 w-full rounded bg-secondary/60" />
+                  <div className="mt-1.5 h-2.5 w-12 rounded bg-secondary/40" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

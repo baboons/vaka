@@ -57,15 +57,26 @@ export async function addToLibrary(input: {
   const config = getConfig(db);
 
   try {
-    const existing = repo.findMediaByProvider(input.provider, input.providerId, db);
+    let provider = input.provider;
+    let providerId = input.providerId;
+
+    // Series are discovered by IMDb id but tracked through TVmaze, which is
+    // where episode lists come from — so resolve before anything else.
+    if (input.kind === "tv" && provider !== "tvmaze") {
+      const resolved = await providers.resolveTvByImdb(providerId);
+      provider = resolved.provider;
+      providerId = resolved.providerId;
+    }
+
+    const existing = repo.findMediaByProvider(provider, providerId, db);
     if (existing) {
       return { ok: false, message: `${existing.title} is already in your library` };
     }
 
     const details = await providers.refreshMetadata(
       input.kind,
-      input.provider,
-      input.providerId,
+      provider,
+      providerId,
       config.general.tmdbApiKey,
     );
 

@@ -97,6 +97,7 @@ interface TvmazeShow {
   name: string;
   premiered: string | null;
   ended: string | null;
+  language: string | null;
   status: string | null;
   runtime: number | null;
   averageRuntime: number | null;
@@ -240,9 +241,9 @@ function runtimeFromText(value: string | undefined): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function mapCinemeta(meta: CinemetaMeta): SearchResult {
+function mapCinemeta(meta: CinemetaMeta, kind: MediaKind = "movie"): SearchResult {
   return {
-    kind: "movie",
+    kind,
     provider: "cinemeta",
     providerId: meta.id,
     title: meta.name,
@@ -270,7 +271,8 @@ export async function searchMovies(query: string, tmdbApiKey?: string): Promise<
   const data = await fetchJson<{ metas: CinemetaMeta[] }>(
     `${CINEMETA}/catalog/movie/top/search=${encodeURIComponent(query)}.json`,
   );
-  return (data.metas ?? []).map(mapCinemeta);
+  // Not point-free: map would pass the index in as `kind`.
+  return (data.metas ?? []).map((meta) => mapCinemeta(meta));
 }
 
 export async function getMovie(
@@ -291,6 +293,97 @@ export async function getMovie(
   );
   if (!data.meta) throw new ProviderError(`movie ${providerId} not found`);
   return mapCinemeta(data.meta);
+}
+
+/* ------------------------------------------------------------------ */
+/* Discovery                                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A Cinemeta catalog: `top` is what is popular now, `year` is newly released.
+ * Keyless, IMDb-backed, and available for both films and series.
+ */
+export async function cinemetaCatalog(
+  kind: MediaKind,
+  catalog: "top" | "year",
+): Promise<SearchResult[]> {
+  const type = kind === "tv" ? "series" : "movie";
+  const data = await fetchJson<{ metas: CinemetaMeta[] }>(
+    `${CINEMETA}/catalog/${type}/${catalog}.json`,
+  );
+  return (data.metas ?? []).map((meta) => mapCinemeta(meta, kind));
+}
+
+/**
+ * Resolve an IMDb id to the TVmaze show.
+ *
+ * Discovery lists series by IMDb id, but tvarr tracks TV through TVmaze
+ * because that is where the episode lists come from. TVmaze answers this
+ * lookup with a 301 to the show, which fetch follows.
+ */
+export async function resolveTvByImdb(imdbId: string): Promise<SearchResult> {
+  const show = await fetchJson<TvmazeShow>(
+    `${TVMAZE}/lookup/shows?imdb=${encodeURIComponent(imdbId)}`,
+  );
+  if (!show?.id) throw new ProviderError(`no TVmaze entry for ${imdbId}`);
+  return mapShow(show);
+}
+
+interface TvmazeScheduleEntry {
+  season: number | null;
+  number: number | null;
+  airdate: string | null;
+  airstamp: string | null;
+  _embedded?: { show?: TvmazeShow };
+}
+
+/**
+ * Series premiering from today onwards, soonest first.
+ *
+ * TVmaze has no "upcoming shows" endpoint, so this reads the full future
+ * schedule and keeps first episodes of first seasons. The response is large,
+ * which is why callers cache the trimmed result rather than the raw feed.
+ */
+export async function upcomingPremieres(limit = 20): Promise<SearchResult[]> {
+  const schedule = await fetchJson<TvmazeScheduleEntry[]>(`${TVMAZE}/schedule/full`);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const premieres = schedule.filter((entry) => {
+    const show = entry._embedded?.show;
+    if (!show?.id || !show.image) return false;
+    if (entry.season !== 1 || entry.number !== 1) return false;
+    if (!entry.airdate || entry.airdate < today) return false;
+    // The full schedule spans every country; without this the list is mostly
+    // shows nobody reading an English interface is looking for.
+    return show.language === "English";
+  });
+
+  premieres.sort((a, b) => (a.airdate ?? "").localeCompare(b.airdate ?? ""));
+
+  const seen = new Set<number>();
+  const results: SearchResult[] = [];
+  for (const entry of premieres) {
+    const show = entry._embedded!.show!;
+    if (seen.has(show.id)) continue;
+    seen.add(show.id);
+
+    const mapped = mapShow(show);
+    // The premiere date is more useful here than the show's own metadata.
+    results.push({ ...mapped, releaseDate: entry.airdate ?? mapped.releaseDate });
+    if (results.length >= limit) break;
+  }
+
+  return results;
+}
+
+export async function tmdbList(
+  path: "movie/popular" | "movie/upcoming",
+  tmdbApiKey: string,
+): Promise<SearchResult[]> {
+  const data = await fetchJson<{ results: TmdbMovie[] }>(
+    `${TMDB}/${path}?api_key=${encodeURIComponent(tmdbApiKey.trim())}&include_adult=false`,
+  );
+  return data.results.map(mapTmdb);
 }
 
 export async function search(
