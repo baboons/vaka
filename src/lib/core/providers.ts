@@ -376,6 +376,82 @@ export async function upcomingPremieres(limit = 20): Promise<SearchResult[]> {
   return results;
 }
 
+export interface SeasonSummary {
+  season: number;
+  episodes: number;
+  firstAired: string | null;
+  lastAired: string | null;
+}
+
+export interface TitleDetails extends SearchResult {
+  /** TV only, from the episode list. */
+  seasons: number | null;
+  episodeCount: number | null;
+  seasonBreakdown: SeasonSummary[];
+  /** First aired / released, when known. */
+  firstAired: string | null;
+}
+
+/**
+ * Full metadata for something that is not in the library yet.
+ *
+ * Discovery lists are deliberately sparse — Cinemeta's catalogue omits
+ * descriptions — so the preview screen asks the provider for the real record,
+ * resolving a discovered series to TVmaze on the way.
+ */
+export async function getTitleDetails(
+  kind: MediaKind,
+  provider: string,
+  providerId: string,
+  tmdbApiKey?: string,
+): Promise<TitleDetails> {
+  if (kind === "movie") {
+    const movie = await getMovie(provider, providerId, tmdbApiKey);
+    return {
+      ...movie,
+      seasons: null,
+      episodeCount: null,
+      seasonBreakdown: [],
+      firstAired: movie.releaseDate,
+    };
+  }
+
+  const resolvedId =
+    provider === "tvmaze" ? providerId : (await resolveTvByImdb(providerId)).providerId;
+
+  const [show, episodes] = await Promise.all([
+    getTvShow(resolvedId),
+    // A missing episode list should not cost us the whole page.
+    getTvEpisodes(resolvedId).catch(() => []),
+  ]);
+
+  const bySeason = new Map<number, SeasonSummary>();
+  for (const episode of episodes) {
+    const entry = bySeason.get(episode.season) ?? {
+      season: episode.season,
+      episodes: 0,
+      firstAired: null,
+      lastAired: null,
+    };
+    entry.episodes += 1;
+    if (episode.airDate) {
+      if (!entry.firstAired || episode.airDate < entry.firstAired) entry.firstAired = episode.airDate;
+      if (!entry.lastAired || episode.airDate > entry.lastAired) entry.lastAired = episode.airDate;
+    }
+    bySeason.set(episode.season, entry);
+  }
+
+  const seasonBreakdown = [...bySeason.values()].sort((a, b) => a.season - b.season);
+
+  return {
+    ...show,
+    seasons: seasonBreakdown.length || null,
+    episodeCount: episodes.length || null,
+    seasonBreakdown,
+    firstAired: show.releaseDate,
+  };
+}
+
 export async function tmdbList(
   path: "movie/popular" | "movie/upcoming",
   tmdbApiKey: string,

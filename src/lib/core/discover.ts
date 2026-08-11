@@ -44,10 +44,13 @@ export interface DiscoverData {
  * providers — a series is discovered by IMDb id but tracked by TVmaze id — so
  * this compares external ids first and falls back to title and year.
  */
-export function isTracked(item: providers.SearchResult, library: Media[]): boolean {
+export function findTracked(
+  item: providers.SearchResult,
+  library: Media[],
+): Media | null {
   const itemImdb = item.imdbId ?? (item.providerId.startsWith("tt") ? item.providerId : null);
 
-  return library.some((media) => {
+  return library.find((media) => {
     if (media.kind !== item.kind) return false;
 
     if (media.provider === item.provider && media.providerId === item.providerId) return true;
@@ -60,7 +63,28 @@ export function isTracked(item: providers.SearchResult, library: Media[]): boole
       return Math.abs(media.year - item.year) <= 1;
     }
     return false;
-  });
+  }) ?? null;
+}
+
+export function isTracked(item: providers.SearchResult, library: Media[]): boolean {
+  return findTracked(item, library) !== null;
+}
+
+/** Full details for a title that is not in the library, cached for a day. */
+export async function getPreview(
+  kind: MediaKind,
+  provider: string,
+  providerId: string,
+  db: Db = getDb(),
+): Promise<providers.TitleDetails> {
+  const tmdbKey = getConfig(db).general.tmdbApiKey.trim();
+  const result = await cached(
+    `preview:${kind}:${provider}:${providerId}`,
+    24 * 60 * 60,
+    () => providers.getTitleDetails(kind, provider, providerId, tmdbKey),
+    db,
+  );
+  return result.value;
 }
 
 async function list(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { CalendarClock, Flame } from "lucide-react";
 
 import { AddDialog } from "@/components/add-dialog";
@@ -123,20 +124,29 @@ export function DiscoverSection({
                     className="stagger-in flex w-[132px] shrink-0 flex-col"
                     style={{ animationDelay: `${Math.min(index, 12) * 25}ms` }}
                   >
-                    <Poster
-                      src={item.poster}
-                      alt={item.title}
-                      kind={item.kind}
-                      sizes="132px"
-                      className="mb-2"
-                    />
-
-                    <p
-                      className="line-clamp-1 text-[12.5px] font-medium leading-tight"
-                      title={item.title}
+                    <Link
+                      href={`/preview/${item.kind}/${item.provider}/${encodeURIComponent(item.providerId)}`}
+                      className="group focus-visible:outline-none"
                     >
-                      {item.title}
-                    </p>
+                      <Poster
+                        src={item.poster}
+                        alt={item.title}
+                        kind={item.kind}
+                        sizes="132px"
+                        className={cn(
+                          "mb-2 transition-all duration-300",
+                          "group-hover:-translate-y-1 group-hover:brightness-110",
+                          "group-focus-visible:ring-2 group-focus-visible:ring-signal",
+                        )}
+                      />
+
+                      <p
+                        className="line-clamp-1 text-[12.5px] font-medium leading-tight group-hover:text-signal"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </p>
+                    </Link>
 
                     <p className="mono mb-2 mt-0.5 truncate text-[10.5px] text-muted-foreground">
                       {view === "upcoming" && formatDate(item.releaseDate)

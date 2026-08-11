@@ -140,6 +140,13 @@ Anything already in your library is filtered out, matched across providers by
 IMDb/TVDB id and falling back to title and year. Every card has a one-click
 follow that opens the usual quality dialog.
 
+Clicking a poster — in Discover or in search results — opens a preview page
+with the full synopsis, genres, runtime, status and a season-by-season
+breakdown, plus a link out to IMDb. Discovery lists are deliberately sparse
+(the keyless catalogue carries no descriptions), so the preview fetches the
+real record on demand and caches it for a day. Titles you already follow show
+a link straight to their library page instead of a follow button.
+
 Popular TV comes from Cinemeta's IMDb-backed ranking rather than TVmaze's own
 popularity, which ranks by what is airing and therefore surfaces soaps and talk
 shows. Premieres come from the TVmaze schedule. Films come from TMDB when a key

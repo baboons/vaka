@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SearchX, Sparkles } from "lucide-react";
 
 import { AddDialog } from "@/components/add-dialog";
@@ -124,18 +125,27 @@ function ResultCard({
       className="stagger-in panel flex gap-4 p-3"
       style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
     >
-      <div className="w-[86px] shrink-0">
+      <Link
+        href={`/preview/${result.kind}/${result.provider}/${encodeURIComponent(result.providerId)}`}
+        className="group w-[86px] shrink-0 focus-visible:outline-none"
+      >
         <Poster
           src={result.poster}
           alt={result.title}
           kind={result.kind}
           sizes="86px"
+          className="transition-all group-hover:brightness-110 group-focus-visible:ring-2 group-focus-visible:ring-signal"
         />
-      </div>
+      </Link>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <h3 className="text-[14.5px] font-semibold leading-tight tracking-[-0.01em]">
-          {result.title}
+          <Link
+            href={`/preview/${result.kind}/${result.provider}/${encodeURIComponent(result.providerId)}`}
+            className="transition-colors hover:text-signal"
+          >
+            {result.title}
+          </Link>
         </h3>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
