@@ -173,9 +173,18 @@ second copy. Add a show you already own eight seasons of and only the missing
 episodes stay wanted.
 
 You need the server address (`http://192.168.1.10:32400`) and an
-`X-Plex-Token`: in Plex, open any item → **Get Info** → **View XML**, and the
-token is the `X-Plex-Token` at the end of the address bar. Plain `http` on a
-LAN avoids certificate trouble.
+`X-Plex-Token`. The settings screen walks you through two ways of getting one —
+pick whichever suits you:
+
+- **Plex web app** — open any item → **⋯** → **Get Info** → **View XML**, then
+  copy the `X-Plex-Token=…` from the address bar of the tab that opens.
+- **Server config file** — read `PlexOnlineToken` out of `Preferences.xml`
+  directly on the machine running Plex, which is easier on a headless box. The
+  settings screen gives you a copyable one-liner for Linux, Docker, macOS and
+  Windows.
+
+Plain `http` on a LAN avoids certificate trouble. **Test connection** confirms
+both the address and the token in one go.
 
 Matching prefers IMDb, TVDB and TMDB ids and falls back to title and year, so
 libraries built by the older Plex agents still match. The scan runs on a timer

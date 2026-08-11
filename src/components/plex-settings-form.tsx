@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { requestPlexSync, savePlexSettings, testPlexConnection } from "@/app/actions";
 import { Pill } from "@/components/bits";
+import { PlexTokenHelp } from "@/components/plex-token-help";
 import { RelativeTime } from "@/components/relative-time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,10 +76,10 @@ export function PlexSettingsForm({
           autoComplete="off"
           className="mono text-[12.5px]"
         />
+        <PlexTokenHelp />
         <p className="text-[11.5px] leading-snug text-muted-foreground">
-          In Plex, open any item → <span className="text-foreground/80">Get Info</span> →{" "}
-          <span className="text-foreground/80">View XML</span>; the token is the{" "}
-          <span className="mono">X-Plex-Token</span> at the end of the address bar.
+          Treat this like a password — it grants full access to your Plex account. tvarr keeps it
+          in plain text in its database, so that file deserves the same care as an SSH key.
         </p>
       </div>
 
