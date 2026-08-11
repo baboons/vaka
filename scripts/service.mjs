@@ -28,12 +28,18 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const dataDir = process.env.TVARR_DATA_DIR
+/**
+ * The port and data directory are baked into the unit at install time.
+ *
+ * They are also read back out of an installed unit below, so that re-running
+ * install (which `pnpm run update` does on every update) preserves them
+ * instead of silently resetting a custom port or database location.
+ */
+let dataDir = process.env.TVARR_DATA_DIR
   ? path.resolve(process.env.TVARR_DATA_DIR)
   : path.join(os.homedir(), ".tvarr");
 
-/** Baked into the unit at install time; override with PORT=… when installing. */
-const port = process.env.PORT?.trim() || "4000";
+let port = process.env.PORT?.trim() || "4000";
 
 const nodeBin = process.execPath;
 const tsxCli = path.join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
@@ -82,6 +88,41 @@ function logPath(service) {
 function errorLogPath(service) {
   return path.join(dataDir, `${service.key}.error.log`);
 }
+
+/** Environment baked into an installed unit file, if there is one. */
+function readUnitEnv(service) {
+  const file = servicePath(service);
+  if (!fs.existsSync(file)) return {};
+
+  const text = fs.readFileSync(file, "utf8");
+  const env = {};
+
+  // Only shouty keys are environment variables; every plist structure key
+  // (Label, ProgramArguments, …) contains lowercase letters.
+  const pattern = isMac
+    ? /<key>([A-Z_]+)<\/key>\s*<string>([^<]*)<\/string>/g
+    : /^Environment=([A-Z_]+)=(.*)$/gm;
+
+  for (const match of text.matchAll(pattern)) env[match[1]] = match[2].trim();
+  return env;
+}
+
+/**
+ * Keep the settings an existing install chose, unless this run overrides them
+ * explicitly. Without this, `pnpm run update` would reset a custom port or
+ * data directory back to the defaults on every update.
+ */
+function adoptInstalledSettings() {
+  const explicitPort = Boolean(process.env.PORT?.trim());
+  const explicitDataDir = Boolean(process.env.TVARR_DATA_DIR?.trim());
+  if (explicitPort && explicitDataDir) return;
+
+  const installed = { ...readUnitEnv(SERVICES[0]), ...readUnitEnv(SERVICES[1]) };
+  if (!explicitPort && installed.PORT) port = installed.PORT;
+  if (!explicitDataDir && installed.TVARR_DATA_DIR) dataDir = installed.TVARR_DATA_DIR;
+}
+
+adoptInstalledSettings();
 
 function fail(message) {
   console.error(`\n  ${message}\n`);

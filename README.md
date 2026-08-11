@@ -89,8 +89,11 @@ pnpm run service:print        # show the unit files without installing
 pnpm run service:uninstall
 ```
 
-Install on a different port with `PORT=8080 pnpm run service:install` — the
-port is baked into the unit, so re-run this to change it.
+Install on a different port with `PORT=8080 pnpm run service:install`. The port
+and `TVARR_DATA_DIR` are baked into the unit at install time, and re-running
+install (which every update does) keeps whatever the last install chose — so an
+update never moves you off a custom port or database. Pass the variable again
+to change it.
 
 On Linux, to keep tvarr running while you are logged out:
 
@@ -104,10 +107,18 @@ sudo loginctl enable-linger $USER
 pnpm run update               # pull, install, build, restart both services
 ```
 
+In order: `git pull --ff-only` → `pnpm install` → `pnpm build` → restart the
+watcher **and** the web service, so the interface comes back on the freshly
+built code rather than the old bundle.
+
 It fast-forwards only, so it can never lose local commits, and it refuses to
 run with a dirty working tree. If nothing was pulled it stops early instead of
 rebuilding. `--no-build` skips the web build on watcher-only hosts; `--force`
 runs every step regardless.
+
+If the build fails, the update stops and leaves the old version running rather
+than restarting into a broken one. The web interface may briefly serve stale
+assets while the build rewrites `.next`; the restart at the end clears that.
 
 The update reinstalls the unit files before restarting, which keeps the
 recorded `node` path correct across Node upgrades — otherwise a service can end
