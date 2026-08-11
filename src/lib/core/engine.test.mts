@@ -209,7 +209,7 @@ test("takes the preferred quality even when a lesser release is listed first", a
     .listHistory({ event: "rejected" })
     .find((row) => row.title?.includes("Dune.Part.Two.2024.1080p"));
   assert.ok(rejected, "the weaker duplicate should be recorded as rejected");
-  assert.match(rejected.reason ?? "", /already grabbed/);
+  assert.match(rejected.reason ?? "", /already have 2160p/);
 });
 
 test("rejects the release below the configured quality and says why", async () => {

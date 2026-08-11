@@ -68,13 +68,30 @@ const generalConfigSchema = z.object({
   grabDelayMinutes: z.number().int().min(0).max(1440).default(0),
 });
 
+/**
+ * Optional Plex server, used to cross off anything you already have.
+ *
+ * Read-only: tvarr never writes to Plex, it only asks what is on the shelves.
+ */
+const plexConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Base URL of the server, e.g. http://192.168.1.10:32400 */
+  url: z.string().default(""),
+  /** X-Plex-Token. */
+  token: z.string().default(""),
+  /** Minutes between library scans. */
+  syncIntervalMinutes: z.number().int().min(5).max(1440).default(60),
+});
+
 export type KindConfig = z.infer<typeof kindConfigSchema>;
 export type GeneralConfig = z.infer<typeof generalConfigSchema>;
+export type PlexConfig = z.infer<typeof plexConfigSchema>;
 
 export interface AppConfig {
   tv: KindConfig;
   movies: KindConfig;
   general: GeneralConfig;
+  plex: PlexConfig;
 }
 
 function defaultDownloadDir(kind: MediaKind): string {
@@ -96,6 +113,7 @@ export function defaultConfig(): AppConfig {
       grabBacklog: true,
     },
     general: generalConfigSchema.parse({}),
+    plex: plexConfigSchema.parse({}),
   };
 }
 
@@ -125,7 +143,12 @@ export function getConfig(db: Db = getDb()): AppConfig {
     tv: readSection(db, "tv", kindConfigSchema, defaults.tv),
     movies: readSection(db, "movies", kindConfigSchema, defaults.movies),
     general: readSection(db, "general", generalConfigSchema, defaults.general),
+    plex: readSection(db, "plex", plexConfigSchema, defaults.plex),
   };
+}
+
+export function savePlexConfig(value: PlexConfig, db: Db = getDb()): void {
+  writeSection(db, "plex", plexConfigSchema.parse(value));
 }
 
 /** Config for one library, chosen by kind. */
@@ -151,7 +174,32 @@ export function parseQualityProfile(input: unknown): QualityProfile {
   return parsed.success ? parsed.data : { ...DEFAULT_TV_PROFILE };
 }
 
-export { qualitySchema, kindConfigSchema, generalConfigSchema };
+export { qualitySchema, kindConfigSchema, generalConfigSchema, plexConfigSchema };
+
+/* ------------------------------------------------------------------ */
+/* Plex sync state                                                      */
+/* ------------------------------------------------------------------ */
+
+const plexStateSchema = z.object({
+  lastSyncAt: z.string().nullable().default(null),
+  lastStatus: z.enum(["ok", "error"]).nullable().default(null),
+  lastError: z.string().nullable().default(null),
+  serverName: z.string().nullable().default(null),
+  /** Counts from the last successful sync, for the settings screen. */
+  matchedTitles: z.number().int().default(0),
+  markedEpisodes: z.number().int().default(0),
+  markedMovies: z.number().int().default(0),
+});
+
+export type PlexState = z.infer<typeof plexStateSchema>;
+
+export function getPlexState(db: Db = getDb()): PlexState {
+  return readSection(db, "plexState", plexStateSchema, plexStateSchema.parse({}));
+}
+
+export function savePlexState(patch: Partial<PlexState>, db: Db = getDb()): void {
+  writeSection(db, "plexState", { ...getPlexState(db), ...patch });
+}
 
 /* ------------------------------------------------------------------ */
 /* Watcher heartbeat                                                    */

@@ -578,6 +578,13 @@ export async function addMedia(input: AddMediaInput, db: Db = getDb()): Promise<
 
   repo.updateMedia(media.id, { refreshedAt: nowIso() }, db);
 
+  // Cross off whatever Plex already holds *before* searching, so adding a show
+  // you own most of does not immediately queue its whole back catalogue.
+  // Jobs run in id order, so this lands first.
+  if (getConfig(db).plex.enabled) {
+    repo.enqueueJob("sync_plex", { mediaId: media.id }, db);
+  }
+
   // Releases for this title may already be sitting in the feed cache.
   repo.enqueueJob("search_media", { mediaId: media.id }, db);
 

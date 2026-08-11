@@ -1,16 +1,22 @@
 import path from "node:path";
 
-import { Clapperboard, Rss, SlidersHorizontal, Terminal, Tv } from "lucide-react";
+import { Clapperboard, Library, Rss, SlidersHorizontal, Terminal, Tv } from "lucide-react";
 
 import { PageHeader, Pill } from "@/components/bits";
 import { FeedManager } from "@/components/feed-manager";
 import { GeneralSettingsForm } from "@/components/general-settings-form";
 import { LibrarySettingsForm } from "@/components/library-settings-form";
+import { PlexSettingsForm } from "@/components/plex-settings-form";
 import { RelativeTime } from "@/components/relative-time";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dataDir, getDb } from "@/lib/core/db";
 import * as repo from "@/lib/core/repo";
-import { getConfig, getWorkerState, isWorkerOnline } from "@/lib/core/settings";
+import {
+  getConfig,
+  getPlexState,
+  getWorkerState,
+  isWorkerOnline,
+} from "@/lib/core/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +26,7 @@ export default function SettingsPage() {
   const db = getDb();
   const config = getConfig(db);
   const feeds = repo.listFeeds(false, db);
+  const plexState = getPlexState(db);
   const worker = getWorkerState(db);
   const online = isWorkerOnline(worker);
 
@@ -45,6 +52,10 @@ export default function SettingsPage() {
             <TabsTrigger value="movies">
               <Clapperboard className="size-3.5" />
               Movies
+            </TabsTrigger>
+            <TabsTrigger value="plex">
+              <Library className="size-3.5" />
+              Plex
             </TabsTrigger>
             <TabsTrigger value="general">
               <SlidersHorizontal className="size-3.5" />
@@ -75,6 +86,17 @@ export default function SettingsPage() {
             <TabsContent value="movies">
               <div className="panel p-5">
                 <LibrarySettingsForm kind="movie" initial={config.movies} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="plex">
+              <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
+                Point tvarr at a Plex server and it will cross off everything you already have,
+                so the watcher never downloads a second copy. Matching prefers IMDb, TVDB and
+                TMDB ids, falling back to title and year.
+              </p>
+              <div className="panel p-5">
+                <PlexSettingsForm initial={config.plex} state={plexState} />
               </div>
             </TabsContent>
 

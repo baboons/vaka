@@ -230,7 +230,13 @@ export function isUpgrade(
   parsed: ParsedRelease,
 ): MatchDecision {
   if (!profile.upgrade) {
-    return { ok: false, reason: "already grabbed", score: 0 };
+    // Naming the quality covers both cases honestly: something tvarr grabbed,
+    // and something that was simply already on the shelf (" · Plex").
+    return {
+      ok: false,
+      reason: currentQuality ? `already have ${currentQuality}` : "already have it",
+      score: 0,
+    };
   }
 
   const current = (currentQuality ?? "").toLowerCase();

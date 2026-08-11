@@ -20,6 +20,7 @@ import {
   refreshMedia,
   searchForMedia,
 } from "../lib/core/engine";
+import { syncPlexSafely } from "../lib/core/plex";
 import * as repo from "../lib/core/repo";
 import { getConfig, getWorkerState, isWorkerOnline, saveWorkerState } from "../lib/core/settings";
 import type { Job } from "../lib/core/types";
@@ -58,6 +59,7 @@ let nextPollAt = 0;
 let nextRefreshAt = 0;
 let nextHeartbeatAt = 0;
 let nextMaintenanceAt = 0;
+let nextPlexSyncAt = 0;
 
 async function runPoll(reason: string): Promise<void> {
   const db = getDb();
@@ -131,6 +133,13 @@ async function runJob(job: Job): Promise<string> {
       log("ok", result.message);
       return result.message;
     }
+    case "sync_plex": {
+      const mediaId = job.payload.mediaId ? Number(job.payload.mediaId) : undefined;
+      const result = await syncPlexSafely({ mediaId }, db);
+      if (!result.ok) throw new Error(result.message);
+      log("ok", `plex: ${result.message}`);
+      return result.message;
+    }
     default:
       throw new Error(`unknown job type: ${job.type}`);
   }
@@ -160,6 +169,19 @@ async function tick(): Promise<void> {
   const now = Date.now();
 
   await drainJobs();
+
+  // Ahead of the feed poll on purpose: crossing off what Plex already holds
+  // has to happen before releases are judged, or the first run after a
+  // restart would grab a back catalogue you already own.
+  if (config.plex.enabled && now >= nextPlexSyncAt) {
+    nextPlexSyncAt = now + config.plex.syncIntervalMinutes * 60_000;
+    const result = await syncPlexSafely({}, db);
+    if (!result.ok) {
+      log("error", `plex: ${result.message}`);
+    } else if (result.summary && result.summary.markedEpisodes + result.summary.markedMovies > 0) {
+      log("ok", `plex: ${result.message}`);
+    }
+  }
 
   if (now >= nextPollAt) {
     const interval = config.general.pollIntervalMinutes * 60_000;

@@ -14,16 +14,20 @@ import { getDb } from "@/lib/core/db";
 import { addMedia as addMediaToLibrary, type MonitorMode } from "@/lib/core/engine";
 import { fetchFeed } from "@/lib/core/feed";
 import { checkDownloadDir } from "@/lib/core/grab";
+import { normalizePlexUrl, testConnection } from "@/lib/core/plex";
 import * as providers from "@/lib/core/providers";
 import * as repo from "@/lib/core/repo";
 import {
   generalConfigSchema,
   getConfig,
   kindConfigSchema,
+  plexConfigSchema,
   saveGeneralConfig,
   saveKindConfig,
+  savePlexConfig,
   type GeneralConfig,
   type KindConfig,
+  type PlexConfig,
 } from "@/lib/core/settings";
 import type { EpisodeState, MediaKind, QualityProfile } from "@/lib/core/types";
 
@@ -275,6 +279,57 @@ export async function deleteFeed(feedId: number): Promise<ActionResult> {
   repo.deleteFeed(feedId);
   refreshAllViews();
   return { ok: true, message: "Feed removed" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Plex                                                                 */
+/* ------------------------------------------------------------------ */
+
+export async function savePlexSettings(config: PlexConfig): Promise<ActionResult> {
+  const parsed = plexConfigSchema.safeParse({
+    ...config,
+    url: normalizePlexUrl(config.url),
+  });
+  if (!parsed.success) return { ok: false, message: "Those settings are not valid" };
+
+  savePlexConfig(parsed.data);
+  refreshAllViews();
+
+  if (parsed.data.enabled) {
+    // Cross off what Plex already has as soon as it is switched on.
+    repo.enqueueJob("sync_plex");
+    return { ok: true, message: "Saved — a library scan is queued" };
+  }
+  return { ok: true, message: "Saved" };
+}
+
+/** Contacts the server and reports what it found, without changing anything. */
+export async function testPlexConnection(config: PlexConfig): Promise<ActionResult> {
+  try {
+    const server = await testConnection({ ...config, url: normalizePlexUrl(config.url) });
+    if (!server.sections.length) {
+      return { ok: false, message: `Connected to ${server.name}, but it has no movie or TV libraries` };
+    }
+    const summary = server.sections
+      .map((section) => `${section.title} (${section.type === "show" ? "TV" : "movies"})`)
+      .join(", ");
+    return { ok: true, message: `Connected to ${server.name} — ${summary}` };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Could not reach that Plex server",
+    };
+  }
+}
+
+export async function requestPlexSync(): Promise<ActionResult> {
+  const config = getConfig(getDb());
+  if (!config.plex.enabled) {
+    return { ok: false, message: "Turn Plex on and save before syncing" };
+  }
+  repo.enqueueJob("sync_plex");
+  refreshAllViews();
+  return { ok: true, message: "Queued a Plex scan — the watcher picks it up within seconds" };
 }
 
 /** Fetch a feed right now and report what it contains, without grabbing. */

@@ -16,7 +16,8 @@ your torrent client picks it up.
 
 TV and movies are configured independently: separate download folders and
 separate quality profiles, because wanting 4K films but 1080p episodes is the
-normal case.
+normal case. Point it at a Plex server and anything you already own is crossed
+off automatically.
 
 ## How it works
 
@@ -163,6 +164,36 @@ A profile controls:
 - **Seeders, size limits, and word filters** — must contain / never contain /
   prefer.
 - **Season packs** (TV) — off by default.
+
+## Plex
+
+If you already have a Plex server, point tvarr at it under **Settings → Plex**
+and everything Plex holds is crossed off, so the watcher never downloads a
+second copy. Add a show you already own eight seasons of and only the missing
+episodes stay wanted.
+
+You need the server address (`http://192.168.1.10:32400`) and an
+`X-Plex-Token`: in Plex, open any item → **Get Info** → **View XML**, and the
+token is the `X-Plex-Token` at the end of the address bar. Plain `http` on a
+LAN avoids certificate trouble.
+
+Matching prefers IMDb, TVDB and TMDB ids and falls back to title and year, so
+libraries built by the older Plex agents still match. The scan runs on a timer
+(hourly by default), immediately when you enable it, and once more whenever you
+add a title — before the first feed search, so a back catalogue you own is
+never queued.
+
+Two things worth knowing:
+
+- **It is strictly read-only.** tvarr asks what is on the shelves and nothing
+  more; it never writes to Plex.
+- **It only ever marks things as had, never as wanted again.** If Plex is
+  offline, mid-scan or missing a drive, the worst case is that nothing new gets
+  crossed off — not a wave of re-downloads. If you delete something from Plex
+  and want it back, mark it wanted in tvarr.
+
+Episodes crossed off this way show as `1080p · Plex`, and with **upgrade**
+enabled in the quality profile a better release will still replace them.
 
 ## Where things go
 
