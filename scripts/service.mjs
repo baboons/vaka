@@ -15,8 +15,9 @@
  * and must run as you, not as root.
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -297,7 +298,13 @@ function status() {
 
   const worker = readHeartbeat();
   if (!worker || !worker.heartbeatAt) {
-    info("  Heartbeat   none recorded yet\n");
+    // The watcher clears its heartbeat on a clean exit, so a previous
+    // startedAt tells us it ran and stopped rather than never having run.
+    info(
+      worker?.startedAt
+        ? `  Heartbeat   stopped cleanly (last ran ${ago(worker.lastPollAt)})\n`
+        : "  Heartbeat   the watcher has never run against this database\n",
+    );
     return;
   }
 
@@ -323,8 +330,6 @@ function print() {
   console.log(`\n# ${servicePath}\n`);
   console.log(unitContents());
 }
-
-import { createRequire } from "node:module";
 
 const COMMANDS = { install, uninstall, start, stop, restart, status, logs, print };
 

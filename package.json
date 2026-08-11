@@ -8,13 +8,18 @@
     "start": "next start",
     "watch": "tsx src/worker/main.ts",
     "watch:dev": "tsx watch src/worker/main.ts",
+    "update": "node scripts/update.mjs",
+    "service:install": "node scripts/service.mjs install",
+    "service:restart": "node scripts/service.mjs restart",
+    "service:start": "node scripts/service.mjs start",
+    "service:stop": "node scripts/service.mjs stop",
+    "service:status": "node scripts/service.mjs status",
+    "service:logs": "node scripts/service.mjs logs",
+    "service:print": "node scripts/service.mjs print",
+    "service:uninstall": "node scripts/service.mjs uninstall",
     "test": "tsx --test src/lib/core/*.test.mts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint",
-    "install:launchd": "node scripts/install-service.mjs",
-    "install:systemd": "node scripts/install-service.mjs",
-    "service:print": "node scripts/install-service.mjs --print",
-    "service:remove": "node scripts/install-service.mjs --uninstall"
+    "lint": "eslint"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -47,10 +52,5 @@
     "typescript": "^5"
   },
   "packageManager": "pnpm@10.33.0",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
-  },
   "description": "Track TV shows and movies, watch your torrent RSS feeds, and auto-download what you want."
 }
