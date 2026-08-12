@@ -33,6 +33,8 @@ export interface SearchResult {
   imdbId: string | null;
   tvdbId: string | null;
   releaseDate: string | null;
+  /** Discovery only: why this is in the list, e.g. "Season 4". */
+  note?: string | null;
 }
 
 export interface ProviderEpisode {
@@ -98,6 +100,7 @@ interface TvmazeShow {
   premiered: string | null;
   ended: string | null;
   language: string | null;
+  weight: number | null;
   status: string | null;
   runtime: number | null;
   averageRuntime: number | null;
@@ -222,6 +225,8 @@ interface CinemetaMeta {
   released?: string;
   runtime?: string;
   genres?: string[];
+  popularity?: number;
+  imdbRating?: string | number;
   country?: string;
 }
 
@@ -311,7 +316,25 @@ export async function cinemetaCatalog(
   const data = await fetchJson<{ metas: CinemetaMeta[] }>(
     `${CINEMETA}/catalog/${type}/${catalog}.json`,
   );
-  return (data.metas ?? []).map((meta) => mapCinemeta(meta, kind));
+
+  const metas = data.metas ?? [];
+
+  /*
+   * The "new" catalogue is returned in release order, which buries the films
+   * anyone has heard of under a long tail of tiny releases. It carries
+   * popularity and an IMDb rating, so rank by those; a rating on its own is
+   * not enough, since a 9.2 from eleven votes outranks a blockbuster.
+   *
+   * The "top" catalogue is already a popularity ranking and carries neither
+   * field, so this leaves its order untouched.
+   */
+  const ranked = [...metas].sort((a, b) => {
+    const byPopularity = (b.popularity ?? 0) - (a.popularity ?? 0);
+    if (byPopularity !== 0) return byPopularity;
+    return Number(b.imdbRating ?? 0) - Number(a.imdbRating ?? 0);
+  });
+
+  return ranked.map((meta) => mapCinemeta(meta, kind));
 }
 
 /**
@@ -337,12 +360,21 @@ interface TvmazeScheduleEntry {
   _embedded?: { show?: TvmazeShow };
 }
 
+/** Below this, TVmaze's popularity weight means almost nobody is watching. */
+const MIN_PREMIERE_WEIGHT = 50;
+
 /**
- * Series premiering from today onwards, soonest first.
+ * Premieres from today onwards — new series and returning seasons alike.
  *
  * TVmaze has no "upcoming shows" endpoint, so this reads the full future
- * schedule and keeps first episodes of first seasons. The response is large,
- * which is why callers cache the trimmed result rather than the raw feed.
+ * schedule. Two decisions shape the result:
+ *
+ *   - Every first episode counts, not only first-episode-of-first-season. A
+ *     new season of a big show is exactly what someone browsing "coming soon"
+ *     wants, and the card says which season it is.
+ *   - The list is ranked by TVmaze's popularity weight *before* being cut, then
+ *     put back in date order. Cutting by date alone fills the row with local
+ *     magazine shows that happen to air tomorrow.
  */
 export async function upcomingPremieres(limit = 20): Promise<SearchResult[]> {
   const schedule = await fetchJson<TvmazeScheduleEntry[]>(`${TVMAZE}/schedule/full`);
@@ -351,29 +383,36 @@ export async function upcomingPremieres(limit = 20): Promise<SearchResult[]> {
   const premieres = schedule.filter((entry) => {
     const show = entry._embedded?.show;
     if (!show?.id || !show.image) return false;
-    if (entry.season !== 1 || entry.number !== 1) return false;
+    if (entry.number !== 1 || entry.season === null) return false;
     if (!entry.airdate || entry.airdate < today) return false;
+    if ((show.weight ?? 0) < MIN_PREMIERE_WEIGHT) return false;
     // The full schedule spans every country; without this the list is mostly
     // shows nobody reading an English interface is looking for.
     return show.language === "English";
   });
 
-  premieres.sort((a, b) => (a.airdate ?? "").localeCompare(b.airdate ?? ""));
-
-  const seen = new Set<number>();
-  const results: SearchResult[] = [];
+  // Earliest premiere per show, so a show does not appear twice.
+  const earliest = new Map<number, TvmazeScheduleEntry>();
   for (const entry of premieres) {
     const show = entry._embedded!.show!;
-    if (seen.has(show.id)) continue;
-    seen.add(show.id);
-
-    const mapped = mapShow(show);
-    // The premiere date is more useful here than the show's own metadata.
-    results.push({ ...mapped, releaseDate: entry.airdate ?? mapped.releaseDate });
-    if (results.length >= limit) break;
+    const held = earliest.get(show.id);
+    if (!held || (entry.airdate ?? "") < (held.airdate ?? "")) earliest.set(show.id, entry);
   }
 
-  return results;
+  const ranked = [...earliest.values()]
+    .sort((a, b) => (b._embedded!.show!.weight ?? 0) - (a._embedded!.show!.weight ?? 0))
+    .slice(0, limit)
+    .sort((a, b) => (a.airdate ?? "").localeCompare(b.airdate ?? ""));
+
+  return ranked.map((entry) => {
+    const show = entry._embedded!.show!;
+    return {
+      ...mapShow(show),
+      // The premiere date is more useful here than the show's own metadata.
+      releaseDate: entry.airdate ?? null,
+      note: entry.season === 1 ? "New series" : `Season ${entry.season}`,
+    };
+  });
 }
 
 export interface SeasonSummary {

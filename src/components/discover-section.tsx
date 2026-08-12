@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, Flame } from "lucide-react";
 
@@ -11,6 +11,60 @@ import type { DiscoverList } from "@/lib/core/discover";
 import type { QualityProfile } from "@/lib/core/types";
 
 type View = "popular" | "upcoming";
+
+/**
+ * Lets a vertical mouse wheel scroll a horizontal row.
+ *
+ * The listener has to be attached by hand: React registers wheel handlers as
+ * passive, and a passive handler cannot call preventDefault, so the page would
+ * scroll as well as the row.
+ *
+ * At either end the event is left alone, so reaching the end of a row does not
+ * trap the page — you keep scrolling and the page moves on.
+ */
+function useWheelScroll<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+
+  const onWheel = useCallback((event: WheelEvent) => {
+    const element = ref.current;
+    if (!element) return;
+    if (element.scrollWidth <= element.clientWidth) return;
+
+    // A trackpad swiping sideways already scrolls this correctly.
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+
+    const atStart = element.scrollLeft <= 0;
+    const atEnd = element.scrollLeft + element.clientWidth >= element.scrollWidth - 1;
+    if ((event.deltaY < 0 && atStart) || (event.deltaY > 0 && atEnd)) return;
+
+    event.preventDefault();
+    element.scrollLeft += event.deltaY;
+  }, []);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [onWheel]);
+
+  return ref;
+}
+
+/** One horizontal row of discovery cards. */
+function ScrollRow({ children }: { children: React.ReactNode }) {
+  const ref = useWheelScroll<HTMLDivElement>();
+
+  return (
+    <div
+      ref={ref}
+      // overscroll-x-contain stops a sideways swipe triggering back-navigation.
+      className="-mx-1 flex gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2"
+    >
+      {children}
+    </div>
+  );
+}
 
 function formatDate(value: string | null): string | null {
   if (!value) return null;
@@ -114,7 +168,7 @@ export function DiscoverSection({
             ) : (
               // A scrolling row keeps the dashboard compact; the whole list is
               // reachable without pushing everything else off the page.
-              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+              <ScrollRow>
                 {list.items.map((item, index) => (
                   // Fixed width and a flex column so every card in the row is
                   // the same height and the buttons line up, however long the
@@ -157,6 +211,16 @@ export function DiscoverSection({
                       )}
                     </p>
 
+                    {/*
+                      "Season 4" vs "New series": without it, a returning
+                      season under "Premiering soon" is baffling.
+                    */}
+                    {view === "upcoming" && item.note && (
+                      <p className="mono -mt-1.5 mb-2 truncate text-[10px] text-signal/80">
+                        {item.note}
+                      </p>
+                    )}
+
                     <div className="mt-auto">
                       <AddDialog
                         result={item}
@@ -166,7 +230,7 @@ export function DiscoverSection({
                     </div>
                   </article>
                 ))}
-              </div>
+              </ScrollRow>
             )}
           </div>
         ))}

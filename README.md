@@ -133,8 +133,10 @@ up pointing at a version that no longer exists.
 The dashboard suggests things you are not already following, in two views:
 
 - **Popular now** — what people are watching, for TV and film.
-- **Coming soon** — series premiering in the next weeks, with their air date
-  and network, plus upcoming films.
+- **Coming soon** — premieres in the next weeks with their air date and
+  network, plus upcoming films. Returning seasons count as premieres and are
+  labelled (*Season 4*, *New series*), because a new season of something big is
+  usually what you are looking for.
 
 Anything already in your library is filtered out, matched across providers by
 IMDb/TVDB id and falling back to title and year. Every card has a one-click
@@ -146,6 +148,15 @@ breakdown, plus a link out to IMDb. Discovery lists are deliberately sparse
 (the keyless catalogue carries no descriptions), so the preview fetches the
 real record on demand and caches it for a day. Titles you already follow show
 a link straight to their library page instead of a follow button.
+
+Both rows are ranked before they are cut, not after. Premieres are ordered by
+TVmaze's popularity weight and only then put back in date order — sorting by
+date alone fills the row with whatever local magazine show happens to air
+tomorrow. New releases are ordered by popularity with the IMDb rating as a
+tiebreak, since a 9.2 from eleven votes should not outrank a blockbuster.
+
+The rows scroll sideways with a mouse wheel, and hand back to the page once you
+reach the end rather than trapping the scroll.
 
 Popular TV comes from Cinemeta's IMDb-backed ranking rather than TVmaze's own
 popularity, which ranks by what is airing and therefore surfaces soaps and talk
