@@ -19,7 +19,8 @@
     "service:uninstall": "node scripts/service.mjs uninstall",
     "test": "tsx --test src/lib/core/*.test.mts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint"
+    "lint": "eslint",
+    "doctor": "tsx scripts/doctor.mts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

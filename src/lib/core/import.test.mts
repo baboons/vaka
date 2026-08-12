@@ -282,6 +282,51 @@ test("move mode relocates the file instead of linking it", async () => {
   await assert.rejects(() => fs.stat(source), "the source should be gone after a move");
 });
 
+test("recognises a download tvarr grabbed itself, however it is punctuated", () => {
+  // Adoption of a torrent client's existing downloads must never swallow
+  // something tvarr asked for: that silently loses the episode forever.
+  const db = getDb();
+  repo.addHistory(
+    {
+      event: "grabbed",
+      title: "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
+    },
+    db,
+  );
+
+  assert.equal(
+    repo.wasGrabbedByTvarr(
+      "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
+      db,
+    ),
+    true,
+    "exact match",
+  );
+
+  // Transmission names a single-file torrent after the file, extension and all.
+  assert.equal(
+    repo.wasGrabbedByTvarr(
+      "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB.mkv",
+      db,
+    ),
+    true,
+    "the .mkv suffix must not hide the match",
+  );
+
+  // Some trackers hand out spaces where the feed had dots.
+  assert.equal(
+    repo.wasGrabbedByTvarr(
+      "Ted Lasso S04E02 Curiouser and Curiouser 1080p ATVP WEB-DL DDP5 1 Atmos H 264-playWEB",
+      db,
+    ),
+    true,
+    "separators must not hide the match",
+  );
+
+  assert.equal(repo.wasGrabbedByTvarr("Moonwalker.1988.1080p.BluRay.x264-OFT", db), false);
+  assert.equal(repo.wasGrabbedByTvarr("", db), false);
+});
+
 test("cleanup refuses to retire a torrent whose library copy has vanished", async () => {
   const { cleanupSeeded } = await import("./import-runner");
   const db = getDb();

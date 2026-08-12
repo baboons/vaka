@@ -265,6 +265,18 @@ Two guards, since this deletes things:
   deleted out of the library, the download is left alone and the reason is
   logged, rather than leaving you with no copy at all.
 
+### Why didn't something import?
+
+```bash
+pnpm run doctor                      # config check, then every download explained
+pnpm run doctor --now                # ...and run a scan right away
+pnpm run doctor --retry "Ted Lasso"   # forget a record so it is tried again
+```
+
+It prints whether importing is on, whether each library folder is set and
+writable, whether Transmission answers — then, for every finished download,
+either where it was filed, why it was skipped, or where it *would* go.
+
 ### Transmission
 
 Turn on **Settings → Import → Transmission** and tvarr asks Transmission which
@@ -369,6 +381,7 @@ pnpm watch:dev    # the watcher, restarting on file changes
 pnpm run update   # pull, install, build, restart the services
 pnpm run service:install|status|logs|restart|start|stop|print|uninstall
 
+pnpm run doctor   # explain why a download did or did not import
 pnpm test         # unit tests + end-to-end grab test
 pnpm typecheck
 pnpm lint

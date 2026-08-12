@@ -778,6 +778,42 @@ export function countRecentGrabs(days = 7, db: Db = getDb()): number {
   return (row.total as number) ?? 0;
 }
 
+/**
+ * Did tvarr itself ask for this release?
+ *
+ * Used when adopting a torrent client's existing downloads: anything tvarr
+ * grabbed is ours to file, however long it has been sitting there.
+ *
+ * Torrent names and feed titles usually match exactly, but trackers sometimes
+ * decorate one or the other, so a punctuation-insensitive comparison backs up
+ * the exact match.
+ */
+export function wasGrabbedByTvarr(releaseName: string, db: Db = getDb()): boolean {
+  const trimmed = releaseName.trim();
+  if (!trimmed) return false;
+
+  const exact = db
+    .prepare("SELECT 1 AS hit FROM history WHERE event = 'grabbed' AND title = ? LIMIT 1")
+    .get(trimmed) as Row | undefined;
+  if (exact) return true;
+
+  const key = normalizeName(trimmed);
+  if (!key) return false;
+
+  const recent = db
+    .prepare(
+      "SELECT title FROM history WHERE event = 'grabbed' AND title IS NOT NULL ORDER BY id DESC LIMIT 500",
+    )
+    .all() as Row[];
+
+  return recent.some((row) => normalizeName(String(row.title)) === key);
+}
+
+/** Lowercase alphanumerics only, so separators and case cannot disagree. */
+function normalizeName(input: string): string {
+  return input.toLowerCase().replace(/\.(mkv|mp4|avi|m4v|ts)$/i, "").replace(/[^a-z0-9]+/g, "");
+}
+
 /** Guards against grabbing the same release twice across polls. */
 export function hasGrabbed(guid: string, db: Db = getDb()): boolean {
   const row = db

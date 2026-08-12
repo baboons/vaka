@@ -66,7 +66,11 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
     if (repo.wasImported(key, db)) continue;
     summary.considered += 1;
 
-    if (adoptWithoutImporting) {
+    // Adoption is for downloads that were already there when tvarr arrived —
+    // never for something tvarr grabbed itself, however recently the client
+    // finished it. Without this, connecting a client on the same day tvarr
+    // grabbed an episode silently skips that episode forever.
+    if (adoptWithoutImporting && !repo.wasGrabbedByTvarr(torrent.name, db)) {
       repo.recordImport(
         {
           sourceKey: key,
