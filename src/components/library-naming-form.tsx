@@ -74,14 +74,20 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label className="label-mono">
+        <Label className="label-mono flex items-center gap-2">
           {kind === "tv" ? "TV library folder" : "Movie library folder"}
+          {/*
+            An empty path is easy to mistake for the placeholder, and the
+            consequence is silent: imports are skipped with "no library folder
+            is configured". Say so on the label itself.
+          */}
+          {!libraryDir.trim() && <Pill tone="alert">not set</Pill>}
         </Label>
         <div className="flex gap-2">
           <Input
             value={libraryDir}
             onChange={(event) => setLibraryDir(event.target.value)}
-            placeholder={kind === "tv" ? "/media/TV" : "/media/Movies"}
+            placeholder={kind === "tv" ? "e.g. /media/TV" : "e.g. /media/Movies"}
             className="mono text-[12.5px]"
           />
           <Button
@@ -98,8 +104,15 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
           </Button>
         </div>
         <p className="text-[11.5px] leading-snug text-muted-foreground">
-          Where Plex reads this library from. Leave empty to keep importing turned off for{" "}
-          {kind === "tv" ? "TV" : "movies"}.
+          Where Plex reads this library from.{" "}
+          {libraryDir.trim() ? (
+            <>Finished {kind === "tv" ? "episodes" : "films"} are filed in here.</>
+          ) : (
+            <span className="text-alert">
+              While this is empty, {kind === "tv" ? "episodes" : "films"} are downloaded but never
+              filed — imports are skipped with “no library folder is configured”.
+            </span>
+          )}
         </p>
       </div>
 

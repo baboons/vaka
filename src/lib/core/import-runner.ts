@@ -75,7 +75,8 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
         {
           sourceKey: key,
           name: torrent.name,
-          status: "skipped",
+          // "adopted" is deliberate and final; "skipped" gets retried.
+          status: "adopted",
           detail: "already complete when tvarr was connected",
         },
         db,
@@ -85,6 +86,22 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
     }
 
     const source = transmission.localPathFor(torrent, config.transmission);
+
+    // A watch folder pointing at Transmission's own download directory would
+    // otherwise file the same download twice, under two different keys.
+    if (repo.wasPathImported(source, db)) {
+      repo.recordImport(
+        {
+          sourceKey: key,
+          name: torrent.name,
+          path: source,
+          status: "adopted",
+          detail: "already filed from the watch folder",
+        },
+        db,
+      );
+      continue;
+    }
 
     try {
       await fs.access(source);
@@ -151,6 +168,22 @@ export async function scanWatchDir(db: Db = getDb()): Promise<ScanSummary> {
     const source = path.join(root, entry.name);
     const key = `path:${source}`;
     if (repo.wasImported(key, db)) continue;
+
+    // Transmission may already have filed this exact path.
+    if (repo.wasPathImported(source, db)) {
+      repo.recordImport(
+        {
+          sourceKey: key,
+          name: entry.name,
+          path: source,
+          status: "adopted",
+          detail: "already filed from the torrent client",
+        },
+        db,
+      );
+      continue;
+    }
+
     summary.considered += 1;
 
     const outcome = await importPath(source, db, { releaseName: entry.name });

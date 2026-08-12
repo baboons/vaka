@@ -199,17 +199,39 @@ export function defaultConfig(): AppConfig {
   };
 }
 
-function readSection<T>(db: Db, key: string, schema: z.ZodType<T>, fallback: T): T {
+function readRaw(db: Db, key: string): Record<string, unknown> | null {
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as
     | { value: string }
     | undefined;
-  if (!row) return fallback;
+  if (!row) return null;
   try {
-    const parsed = schema.safeParse(JSON.parse(row.value));
-    return parsed.success ? parsed.data : fallback;
+    const parsed = JSON.parse(row.value);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
   } catch {
-    return fallback;
+    return null;
   }
+}
+
+/**
+ * Read a settings section, filling gaps from `fallback` rather than from the
+ * schema's own defaults.
+ *
+ * This matters when a field is added in a later version: a config saved before
+ * then has no value for it, and the schema default cannot know whether it is
+ * being applied to the TV section or the movie one. Merging the caller's
+ * kind-correct defaults underneath keeps TV files named as episodes.
+ */
+function readSection<T>(db: Db, key: string, schema: z.ZodType<T>, fallback: T): T {
+  const stored = readRaw(db, key);
+  if (!stored) return fallback;
+
+  const merged =
+    fallback && typeof fallback === "object"
+      ? { ...(fallback as Record<string, unknown>), ...stored }
+      : stored;
+
+  const parsed = schema.safeParse(merged);
+  return parsed.success ? parsed.data : fallback;
 }
 
 function writeSection(db: Db, key: string, value: unknown): void {

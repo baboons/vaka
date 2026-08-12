@@ -837,6 +837,7 @@ export interface ImportRecord {
   /** Files written into the library, checked before cleaning up the source. */
   libraryPaths: string[];
   cleanedAt: string | null;
+  attempts: number;
   createdAt: string;
 }
 
@@ -851,15 +852,44 @@ function mapImport(row: Row): ImportRecord {
     detail: (row.detail as string) ?? null,
     libraryPaths: parseJson<string[]>(row.library_paths, []),
     cleanedAt: (row.cleaned_at as string) ?? null,
+    attempts: (row.attempts as number) ?? 1,
     createdAt: row.created_at as string,
   };
 }
 
-/** Keyed by torrent hash, or by path for folder scans. */
+/**
+ * How many times a download is retried before tvarr gives up on it.
+ *
+ * Most non-success verdicts are circumstantial — the download had not finished
+ * moving, a library folder was not configured yet — so recording one forever
+ * strands the file. A handful of retries clears those without re-walking a
+ * download folder full of things that will never match.
+ */
+export const MAX_IMPORT_ATTEMPTS = 5;
+
+/** Verdicts that are deliberate and will not change on their own. */
+const FINAL_IMPORT_STATUSES = new Set(["done", "adopted"]);
+
+/**
+ * Has this download been dealt with for good?
+ *
+ * Keyed by torrent hash, or by path for folder scans.
+ */
 export function wasImported(sourceKey: string, db: Db = getDb()): boolean {
   const row = db
-    .prepare("SELECT 1 AS hit FROM imports WHERE source_key = ? LIMIT 1")
+    .prepare("SELECT status, attempts FROM imports WHERE source_key = ? LIMIT 1")
     .get(sourceKey) as Row | undefined;
+  if (!row) return false;
+
+  if (FINAL_IMPORT_STATUSES.has(String(row.status))) return true;
+  return ((row.attempts as number) ?? 1) >= MAX_IMPORT_ATTEMPTS;
+}
+
+/** True when this exact path was already filed, under any source key. */
+export function wasPathImported(sourcePath: string, db: Db = getDb()): boolean {
+  const row = db
+    .prepare("SELECT 1 AS hit FROM imports WHERE path = ? AND status = 'done' LIMIT 1")
+    .get(sourcePath) as Row | undefined;
   return Boolean(row);
 }
 
@@ -869,7 +899,7 @@ export function recordImport(
     name?: string | null;
     path?: string | null;
     fileCount?: number;
-    status: "done" | "failed" | "skipped";
+    status: "done" | "failed" | "skipped" | "adopted";
     detail?: string | null;
     libraryPaths?: string[];
   },
@@ -882,7 +912,8 @@ export function recordImport(
        file_count    = excluded.file_count,
        status        = excluded.status,
        detail        = excluded.detail,
-       library_paths = excluded.library_paths`,
+       library_paths = excluded.library_paths,
+       attempts      = imports.attempts + 1`,
   ).run(
     entry.sourceKey,
     entry.name ?? null,

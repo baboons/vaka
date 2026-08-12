@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS imports (
   detail        TEXT,
   library_paths TEXT    NOT NULL DEFAULT '[]',
   cleaned_at    TEXT,
+  attempts      INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT    NOT NULL
 );
 
@@ -184,6 +185,9 @@ const ADDED_COLUMNS: Array<{ table: string; column: string; definition: string }
   // copy still exists before removing the download.
   { table: "imports", column: "library_paths", definition: "TEXT NOT NULL DEFAULT '[]'" },
   { table: "imports", column: "cleaned_at", definition: "TEXT" },
+  // How many times filing this download has been attempted, so a download
+  // that was merely unfinished at the time gets another chance.
+  { table: "imports", column: "attempts", definition: "INTEGER NOT NULL DEFAULT 1" },
 ];
 
 function applyMigrations(db: Db): void {

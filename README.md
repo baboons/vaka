@@ -275,7 +275,14 @@ pnpm run doctor --retry "Ted Lasso"   # forget a record so it is tried again
 
 It prints whether importing is on, whether each library folder is set and
 writable, whether Transmission answers — then, for every finished download,
-either where it was filed, why it was skipped, or where it *would* go.
+either where it was filed or where it *would* go right now. Anything unfinished
+is re-planned live rather than reported from the ledger, because an old verdict
+often predates the setting that has since been fixed.
+
+A download that was skipped for a fixable reason — the library folder was not
+set yet, the file was still being written — is retried automatically on later
+scans, up to five attempts. Only a deliberate decision (filed, or adopted as
+pre-existing) is final.
 
 ### Transmission
 

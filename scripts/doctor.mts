@@ -168,16 +168,19 @@ for (const candidate of candidates) {
     continue;
   }
 
-  if (record) {
-    console.log(`  ${BAD} ${short}`);
-    console.log(`      ${record.status}: ${record.detail ?? "no reason recorded"}`);
+  if (record?.status === "adopted") {
+    console.log(`  ${DIM}—  ${short}${RESET}`);
+    console.log(`      ${DIM}left alone: ${record.detail ?? "adopted"}${RESET}`);
     console.log(
-      `      ${DIM}retry with: pnpm run doctor --retry "${candidate.name.slice(0, 32)}"${RESET}`,
+      `      ${DIM}file it anyway: pnpm run doctor --retry "${candidate.name.slice(0, 32)}"${RESET}`,
     );
     continue;
   }
 
-  // Not in the ledger: work out what would happen to it right now.
+  // Anything not finished is re-planned live rather than reported from the
+  // ledger: the old verdict may predate the setting that has since been fixed.
+  const previously = record ? `${record.status}: ${record.detail ?? "no reason"}` : null;
+
   try {
     await fs.access(candidate.source);
   } catch {
@@ -191,12 +194,21 @@ for (const candidate of candidates) {
 
   if (plan.items.length) {
     console.log(`  ${WARN} ${short}`);
-    console.log(`      ${DIM}not filed yet; would go to:${RESET}`);
+    if (previously) console.log(`      ${DIM}earlier verdict: ${previously}${RESET}`);
+    console.log(`      ${DIM}would now go to:${RESET}`);
     for (const item of plan.items) console.log(`      → ${item.destination}`);
+    if (record) {
+      console.log(
+        `      ${DIM}retry it: pnpm run doctor --retry "${candidate.name.slice(0, 32)}" --now${RESET}`,
+      );
+    }
   } else {
     console.log(`  ${BAD} ${short}`);
     for (const skip of plan.skipped.slice(0, 3)) {
       console.log(`      ${skip.reason}  ${DIM}(${path.basename(skip.file)})${RESET}`);
+    }
+    if (record && record.attempts >= 5) {
+      console.log(`      ${DIM}given up after ${record.attempts} attempts${RESET}`);
     }
   }
 }
