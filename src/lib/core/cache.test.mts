@@ -64,11 +64,19 @@ test("ignores an entry written by an older version of the code", async () => {
 
 test("sweeps away entries from older versions", async () => {
   const db = getDb();
-  const stale = db
+  const { pruneCacheVersions } = await import("./cache");
+
+  db.prepare(
+    "INSERT OR REPLACE INTO cache (key, value, expires_at, updated_at) VALUES (?, ?, ?, ?)",
+  ).run("ancient:key", "[]", new Date(Date.now() + 3600_000).toISOString(), nowIso());
+
+  const removed = pruneCacheVersions(db);
+  assert.ok(removed >= 1, "the old-version row should be swept up");
+
+  const left = db
     .prepare("SELECT COUNT(*) AS n FROM cache WHERE key NOT LIKE ?")
     .get(`v${CACHE_VERSION}:%`) as { n: number };
-
-  assert.equal(stale.n, 0, "old-version rows should not accumulate");
+  assert.equal(left.n, 0, "old-version rows must not accumulate");
 });
 
 test("falls back to a stale value when the provider fails", async () => {

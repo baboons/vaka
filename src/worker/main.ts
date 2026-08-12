@@ -11,6 +11,7 @@
  * jobs, the watcher claims them on its next tick and reports back a heartbeat.
  */
 
+import { pruneCacheVersions } from "../lib/core/cache";
 import { closeDb, getDb } from "../lib/core/db";
 import {
   evaluatePendingItems,
@@ -236,6 +237,7 @@ async function tick(): Promise<void> {
     if (nextMaintenanceAt !== 0) {
       const removed = repo.pruneFeedItems(config.general.feedRetentionDays, db);
       repo.pruneJobs(200, db);
+      pruneCacheVersions(db);
       if (removed) log("info", `pruned ${removed} cached feed items`);
     }
     nextMaintenanceAt = now + MAINTENANCE_MS;

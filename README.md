@@ -155,8 +155,10 @@ date alone fills the row with whatever local magazine show happens to air
 tomorrow. New releases are ordered by popularity with the IMDb rating as a
 tiebreak, since a 9.2 from eleven votes should not outrank a blockbuster.
 
-The rows scroll sideways with a mouse wheel, and hand back to the page once you
-reach the end rather than trapping the scroll.
+The rows scroll sideways with a mouse wheel while the pointer is over them, and
+the page is held still for as long as it is — including at the first and last
+card. Move the pointer off the row to scroll the page again. A row short enough
+to fit never captures the wheel at all.
 
 Popular TV comes from Cinemeta's IMDb-backed ranking rather than TVmaze's own
 popularity, which ranks by what is airing and therefore surfaces soaps and talk
@@ -164,6 +166,10 @@ shows. Premieres come from the TVmaze schedule. Films come from TMDB when a key
 is configured and Cinemeta otherwise — and because the keyless catalogue only
 lists films that are already out, the movie row under *Coming soon* is honestly
 labelled **New releases** until you add a TMDB key.
+
+Cache entries carry the version of the code that produced them, and `pnpm run
+update` drops them outright — so a change to how a list is built shows up
+immediately instead of hours later.
 
 Lists are cached (6 hours for popular, 12 for upcoming), so the dashboard's
 auto-refresh costs nothing. If a provider is unreachable the last good list is

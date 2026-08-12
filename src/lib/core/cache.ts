@@ -30,17 +30,28 @@ function versionedKey(key: string): string {
   return `v${CACHE_VERSION}:${key}`;
 }
 
-/** Entries written by an older version can never be useful again. */
-let prunedOldVersions = false;
-
-function pruneOldVersions(db: Db): void {
-  if (prunedOldVersions) return;
-  prunedOldVersions = true;
+/**
+ * Delete entries written by an older version.
+ *
+ * Only housekeeping: a versioned key means an old entry is never *read*
+ * regardless. Called from the watcher's maintenance pass, and once per process
+ * on first use so a web-only run does not accumulate them either.
+ */
+export function pruneCacheVersions(db: Db = getDb()): number {
   try {
-    db.prepare("DELETE FROM cache WHERE key NOT LIKE ?").run(`v${CACHE_VERSION}:%`);
+    return db.prepare("DELETE FROM cache WHERE key NOT LIKE ?").run(`v${CACHE_VERSION}:%`).changes;
   } catch {
     // A missing table on first run is not worth failing a page render over.
+    return 0;
   }
+}
+
+let prunedThisProcess = false;
+
+function pruneOnce(db: Db): void {
+  if (prunedThisProcess) return;
+  prunedThisProcess = true;
+  pruneCacheVersions(db);
 }
 
 function read(key: string, db: Db): CacheRow | null {
@@ -90,7 +101,7 @@ export async function cached<T>(
   load: () => Promise<T>,
   db: Db = getDb(),
 ): Promise<CachedResult<T>> {
-  pruneOldVersions(db);
+  pruneOnce(db);
 
   const key = versionedKey(rawKey);
   const existing = read(key, db);

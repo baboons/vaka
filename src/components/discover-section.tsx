@@ -15,12 +15,15 @@ type View = "popular" | "upcoming";
 /**
  * Lets a vertical mouse wheel scroll a horizontal row.
  *
- * The listener has to be attached by hand: React registers wheel handlers as
- * passive, and a passive handler cannot call preventDefault, so the page would
- * scroll as well as the row.
+ * The listener is attached to the row itself, so it only ever fires while the
+ * pointer is over that row — anywhere else on the page scrolls normally.
  *
- * At either end the event is left alone, so reaching the end of a row does not
- * trap the page — you keep scrolling and the page moves on.
+ * While the pointer *is* over a scrollable row the wheel belongs to the row and
+ * nothing else: the page is held still even at the first and last card, rather
+ * than the row quietly handing the scroll back. Move off the row to scroll on.
+ *
+ * The listener has to be attached by hand because React registers wheel
+ * handlers as passive, and a passive handler cannot call preventDefault.
  */
 function useWheelScroll<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -28,14 +31,12 @@ function useWheelScroll<T extends HTMLElement>() {
   const onWheel = useCallback((event: WheelEvent) => {
     const element = ref.current;
     if (!element) return;
+
+    // A row that fits has nothing to scroll, so leave the page alone entirely.
     if (element.scrollWidth <= element.clientWidth) return;
 
     // A trackpad swiping sideways already scrolls this correctly.
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-
-    const atStart = element.scrollLeft <= 0;
-    const atEnd = element.scrollLeft + element.clientWidth >= element.scrollWidth - 1;
-    if ((event.deltaY < 0 && atStart) || (event.deltaY > 0 && atEnd)) return;
 
     event.preventDefault();
     element.scrollLeft += event.deltaY;
@@ -58,8 +59,9 @@ function ScrollRow({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      // overscroll-x-contain stops a sideways swipe triggering back-navigation.
-      className="-mx-1 flex gap-3 overflow-x-auto overscroll-x-contain px-1 pb-2"
+      // overscroll-contain keeps a sideways swipe from triggering
+      // back-navigation and stops any scroll chaining to the page.
+      className="-mx-1 flex gap-3 overflow-x-auto overscroll-contain px-1 pb-2"
     >
       {children}
     </div>
