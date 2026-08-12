@@ -41,10 +41,14 @@ const qualitySchema = z.object({
 
 /** Per-library settings. One of these for TV, one for movies. */
 const kindConfigSchema = z.object({
-  /** Blackhole directory watched by the torrent client. */
+  /**
+   * Blackhole directory watched by the torrent client.
+   *
+   * `.torrent` files are always written directly here. Torrent clients watch
+   * one directory and do not descend into subfolders, so grouping by title
+   * would simply mean nothing ever gets picked up.
+   */
   downloadDir: z.string().default(""),
-  /** Put each title in its own subfolder inside `downloadDir`. */
-  createFolders: z.boolean().default(false),
   /** Default profile applied to newly added titles. */
   quality: qualitySchema.default(DEFAULT_TV_PROFILE),
   /** Grab episodes/movies that aired before they were added to the library. */
@@ -176,7 +180,6 @@ export function defaultConfig(): AppConfig {
   return {
     tv: {
       downloadDir: defaultDownloadDir("tv"),
-      createFolders: true,
       quality: DEFAULT_TV_PROFILE,
       grabBacklog: false,
       libraryDir: "",
@@ -184,7 +187,6 @@ export function defaultConfig(): AppConfig {
     },
     movies: {
       downloadDir: defaultDownloadDir("movie"),
-      createFolders: false,
       quality: DEFAULT_MOVIE_PROFILE,
       grabBacklog: true,
       libraryDir: "",

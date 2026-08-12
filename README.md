@@ -327,8 +327,9 @@ enabled in the quality profile a better release will still replace them.
 
 - `~/.tvarr/tvarr.db` — library, settings, history. Override the location with
   `TVARR_DATA_DIR`; both processes must agree on it.
-- Download folders are whatever you configure. With *create a folder per title*
-  enabled, files land in `<folder>/Show Name (Year)/`.
+- Download folders are whatever you configure. `.torrent` files are written
+  directly into that folder, never a subfolder — torrent clients watch a single
+  directory and do not descend into it.
 - Any title can override its destination under **Quality → Download folder
   override**.
 

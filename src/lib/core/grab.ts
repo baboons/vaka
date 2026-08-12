@@ -49,16 +49,20 @@ export function sanitizeFilename(input: string, fallback = "download"): string {
   return truncated || fallback;
 }
 
-/** Destination directory for a title, honouring any per-title override. */
+/**
+ * Destination directory for a title's `.torrent` file.
+ *
+ * Always the folder itself, never a subfolder: torrent clients watch a single
+ * directory and do not look inside it, so a per-show subfolder would leave the
+ * file sitting there forever without being picked up.
+ *
+ * A per-title override still works — it just names a different flat folder.
+ */
 export function resolveTargetDir(media: Media, config: KindConfig): string {
   if (media.folder && media.folder.trim()) {
     return path.resolve(expandHome(media.folder.trim()));
   }
-  const root = path.resolve(expandHome(config.downloadDir));
-  if (!config.createFolders) return root;
-
-  const name = media.year ? `${media.title} (${media.year})` : media.title;
-  return path.join(root, sanitizeFilename(name, `media-${media.id}`));
+  return path.resolve(expandHome(config.downloadDir));
 }
 
 /** Avoid clobbering an existing file by appending a counter. */

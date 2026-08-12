@@ -96,14 +96,12 @@ before(async () => {
   settings.saveKindConfig("tv", {
     ...settings.defaultConfig().tv,
     downloadDir: tvDir,
-    createFolders: true,
     quality: { ...DEFAULT_TV_PROFILE, allowed: ["720p", "1080p"], preferred: "1080p" },
     grabBacklog: true,
   });
   settings.saveKindConfig("movie", {
     ...settings.defaultConfig().movies,
     downloadDir: movieDir,
-    createFolders: false,
     quality: {
       ...DEFAULT_MOVIE_PROFILE,
       allowed: ["1080p", "2160p"],
@@ -178,18 +176,23 @@ test("grabs wanted episodes and writes .torrent files to the TV folder", async (
 
   assert.equal(summary.grabbed, 3, "two episodes plus the movie should be grabbed");
 
-  const showDir = path.join(tvDir, "The Expanse (2015)");
-  const files = await fs.readdir(showDir);
+  // Flat, never in a per-show subfolder: torrent clients watch a single
+  // directory and never descend into it, so a subfolder is never picked up.
+  const files = await fs.readdir(tvDir);
   assert.deepEqual(
     files.sort(),
     [
       "The.Expanse.S05E03.1080p.WEB-DL.DDP5.1.H.264-NTb.torrent",
       "The.Expanse.S05E05.1080p.WEB-DL.x264-NTb.torrent",
     ],
-    "only the 1080p episodes should land on disk",
+    "only the 1080p episodes should land on disk, directly in the watch folder",
   );
 
-  const written = await fs.readFile(path.join(showDir, files[0]));
+  for (const entry of await fs.readdir(tvDir, { withFileTypes: true })) {
+    assert.ok(entry.isFile(), `${entry.name} should be a file, not a folder`);
+  }
+
+  const written = await fs.readFile(path.join(tvDir, files[0]));
   assert.deepEqual(written, TORRENT_BODY, "the .torrent payload should be written verbatim");
 });
 
@@ -244,8 +247,7 @@ test("marks grabbed episodes so they are not downloaded twice", async () => {
   const rerun = await engine.searchForMedia(show.id);
   assert.equal(rerun.grabbed, 0);
 
-  const showDir = path.join(tvDir, "The Expanse (2015)");
-  const files = await fs.readdir(showDir);
+  const files = await fs.readdir(tvDir);
   assert.equal(files.length, 2, "no duplicate files should be created");
 });
 

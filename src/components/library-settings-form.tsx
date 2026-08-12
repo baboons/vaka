@@ -9,7 +9,6 @@ import { QualityEditor } from "@/components/quality-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import type { KindConfig } from "@/lib/core/settings";
 import type { MediaKind } from "@/lib/core/types";
 
@@ -65,26 +64,12 @@ export function LibrarySettingsForm({
           </Button>
         </div>
         <p className="text-[11.5px] leading-snug text-muted-foreground">
-          Matching {noun} are written here as <span className="mono">.torrent</span> files. Point
-          your torrent client&apos;s watch folder at the same path and it will pick them up.
+          Matching {noun} are written here as <span className="mono">.torrent</span> files, always
+          directly in this folder — torrent clients watch one directory and do not look inside
+          subfolders. Point your client&apos;s watch folder at the same path.
           <span className="mono"> ~</span> expands to your home folder.
         </p>
       </div>
-
-      <label className="flex cursor-pointer items-start justify-between gap-4 rounded-sm border border-border bg-secondary/30 px-3 py-2.5">
-        <span>
-          <span className="block text-[13px] font-medium">Create a folder per title</span>
-          <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
-            {config.createFolders
-              ? "Files go into a subfolder named after the show or film."
-              : "All files land directly in the download folder."}
-          </span>
-        </span>
-        <Switch
-          checked={config.createFolders}
-          onCheckedChange={(createFolders) => setConfig({ ...config, createFolders })}
-        />
-      </label>
 
       <div>
         <div className="mb-3 flex items-center gap-3">
