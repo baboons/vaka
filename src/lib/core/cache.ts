@@ -8,10 +8,39 @@
 
 import { getDb, nowIso, type Db } from "./db";
 
+/**
+ * Bump this whenever the *derivation* of a cached value changes — a new
+ * ranking, a different filter, an added field.
+ *
+ * Without it, improving how a list is built has no visible effect until the
+ * old entry expires hours later, which reads exactly like the update having
+ * done nothing.
+ *
+ * 2: discovery lists ranked by popularity, premieres include returning seasons
+ */
+export const CACHE_VERSION = 2;
+
 interface CacheRow {
   value: string;
   expires_at: string;
   updated_at: string;
+}
+
+function versionedKey(key: string): string {
+  return `v${CACHE_VERSION}:${key}`;
+}
+
+/** Entries written by an older version can never be useful again. */
+let prunedOldVersions = false;
+
+function pruneOldVersions(db: Db): void {
+  if (prunedOldVersions) return;
+  prunedOldVersions = true;
+  try {
+    db.prepare("DELETE FROM cache WHERE key NOT LIKE ?").run(`v${CACHE_VERSION}:%`);
+  } catch {
+    // A missing table on first run is not worth failing a page render over.
+  }
 }
 
 function read(key: string, db: Db): CacheRow | null {
@@ -56,11 +85,14 @@ export interface CachedResult<T> {
  * stale; only a cold cache propagates the error.
  */
 export async function cached<T>(
-  key: string,
+  rawKey: string,
   ttlSeconds: number,
   load: () => Promise<T>,
   db: Db = getDb(),
 ): Promise<CachedResult<T>> {
+  pruneOldVersions(db);
+
+  const key = versionedKey(rawKey);
   const existing = read(key, db);
 
   if (existing && existing.expires_at > nowIso()) {
@@ -83,6 +115,6 @@ export async function cached<T>(
 
 export function clearCache(prefix?: string, db: Db = getDb()): number {
   return prefix
-    ? db.prepare("DELETE FROM cache WHERE key LIKE ?").run(`${prefix}%`).changes
+    ? db.prepare("DELETE FROM cache WHERE key LIKE ?").run(`v${CACHE_VERSION}:${prefix}%`).changes
     : db.prepare("DELETE FROM cache").run().changes;
 }

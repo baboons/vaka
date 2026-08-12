@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isInstalled, restart } from "./service.mjs";
+import { isInstalled, resolvedDataDir, restart } from "./service.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -114,6 +114,29 @@ if (!skipBuild) {
     // serving, and the operator can retry once the build is fixed.
     fail("The build failed. tvarr was left running on the old code.");
   }
+}
+
+// Cached provider responses are derived data. After a code change the way they
+// are built may have changed, and a stale entry makes the update look like it
+// did nothing at all.
+step("Clearing cached lists…");
+try {
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const Database = require("better-sqlite3");
+  const dbPath = path.join(resolvedDataDir(), "tvarr.db");
+
+  if (fs.existsSync(dbPath)) {
+    const db = new Database(dbPath);
+    const cleared = db.prepare("DELETE FROM cache").run().changes;
+    db.close();
+    console.log(`  dropped ${cleared} cached list(s); they refetch on demand`);
+  } else {
+    console.log("  no database yet, nothing to clear");
+  }
+} catch (error) {
+  // Never fail an update over a cache that will expire on its own.
+  console.log(`  skipped (${error instanceof Error ? error.message : String(error)})`);
 }
 
 step("Restarting…");

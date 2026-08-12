@@ -156,6 +156,11 @@ export function isInstalled() {
   return SERVICES.some((service) => fs.existsSync(servicePath(service)));
 }
 
+/** Where the database lives, honouring anything baked into an installed unit. */
+export function resolvedDataDir() {
+  return dataDir;
+}
+
 /* ------------------------------------------------------------------ */
 /* Unit files                                                           */
 /* ------------------------------------------------------------------ */
