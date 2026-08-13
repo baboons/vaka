@@ -44,16 +44,24 @@ const RESOLUTION_PATTERNS: Array<[Resolution, RegExp]> = [
 
 const SD_PATTERN = /\b(sd|sdtv|dvdrip|dvdscr|vhs|xvid|divx)\b/i;
 
+/*
+ * Order matters: the first pattern to match wins, so the pre-retail markers are
+ * tested before the generic ones. A cinema rip that also says "1080p" must be
+ * recognised as a cinema rip, not waved through as an unknown source.
+ */
 const SOURCE_PATTERNS: Array<[Source, RegExp]> = [
+  ["cam", /\b(cam[\s._-]?rip|hd[\s._-]?cam|hq[\s._-]?cam|camts|cam)\b/i],
+  ["telesync", /\b(telesync|hd[\s._-]?ts|ts[\s._-]?rip|pre[\s._-]?dvd|pdvd|ts)\b/i],
+  // TeleCine: captured from the film print. Different method to a telesync,
+  // same cinema-grade result, and routinely tagged only as "TC".
+  ["telecine", /\b(telecine|hd[\s._-]?tc|tc[\s._-]?rip|tc)\b/i],
+  ["screener", /\b(dvd[\s._-]?scr|bd[\s._-]?scr|screener|scr|workprint|r5)\b/i],
   ["remux", /\bremux\b/i],
   ["bluray", /\b(blu[\s._-]?ray|bd[\s._-]?rip|br[\s._-]?rip|bdmv|bd25|bd50)\b/i],
   ["webrip", /\bweb[\s._-]?rip\b/i],
   ["webdl", /\b(web[\s._-]?dl|webdl|web)\b/i],
   ["hdtv", /\b(hd[\s._-]?tv|pdtv|dsr|dtv)\b/i],
   ["dvd", /\b(dvd|dvd[\s._-]?r|ntsc|pal)\b/i],
-  ["screener", /\b(dvd[\s._-]?scr|screener|bdscr)\b/i],
-  ["telesync", /\b(telesync|hd[\s._-]?ts|tsrip)\b/i],
-  ["cam", /\b(cam[\s._-]?rip|hd[\s._-]?cam|camts|\bcam\b)\b/i],
 ];
 
 const CODEC_PATTERNS: Array<[string, RegExp]> = [

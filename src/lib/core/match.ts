@@ -105,12 +105,22 @@ export function findMedia(
   return pool[0];
 }
 
+/**
+ * Whether a release title contains a word, as a *word*.
+ *
+ * Substring matching looks equivalent and is not: banning "tc" would throw away
+ * "The Watch" and "Catch Me", and banning "cam" would throw away anything with
+ * "Cameron" in the title. Both ends are anchored to a non-alphanumeric
+ * boundary, on a separator-normalized copy so "web dl" still matches "WEB-DL".
+ */
 function containsWord(haystack: string, word: string): boolean {
-  const needle = word.trim().toLowerCase();
+  const needle = word.trim().toLowerCase().replace(/[._-]+/g, " ");
   if (!needle) return false;
-  // Compare on a separator-normalized string so "web dl" matches "WEB-DL".
+
   const normalized = haystack.toLowerCase().replace(/[._-]+/g, " ");
-  return normalized.includes(needle.replace(/[._-]+/g, " "));
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(normalized);
 }
 
 /**

@@ -205,11 +205,15 @@ A profile controls:
   *already have 2160p* rather than downloaded on top of it.
 - **Upgrade** — keep replacing with better releases until the preferred quality
   is reached. Off by default.
-- **Accepted sources** — WEB-DL, BluRay, HDTV and so on. A release whose source
-  cannot be identified is still allowed through, since resolution is the filter
-  that actually matters and plenty of feeds use sloppy names.
+- **Accepted sources** — WEB-DL, BluRay, HDTV and so on. The pre-retail family
+  is split into CAM, TS (telesync), TC (telecine) and Screener, and each is
+  recognised by every abbreviation in common use — a cinema rip tagged only
+  `TC` next to a `1080p` label is still a cinema rip. A release whose source
+  cannot be identified at all is allowed through, since plenty of feeds omit it
+  entirely and resolution is the filter doing the real work.
 - **Seeders, size limits, and word filters** — must contain / never contain /
-  prefer.
+  prefer. Words are matched as whole words, so banning `tc` does not also throw
+  away *The Watch* and *Catch Me*.
 - **Season packs** (TV) — off by default.
 
 ## Filing downloads into your library

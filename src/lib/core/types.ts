@@ -11,10 +11,18 @@ export type MediaKind = "tv" | "movie";
 export const RESOLUTIONS = ["sd", "480p", "576p", "720p", "1080p", "2160p"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
 
-/** Ordered worst -> best. */
+/**
+ * Ordered worst -> best.
+ *
+ * The first four are the "pre-retail" family — filmed in a cinema, captured
+ * from a print, or an early review copy. They are separate entries because a
+ * profile should be able to accept one without the others, but in practice
+ * anyone excluding one wants all of them gone.
+ */
 export const SOURCES = [
   "cam",
   "telesync",
+  "telecine",
   "screener",
   "dvd",
   "hdtv",
@@ -38,6 +46,7 @@ export const RESOLUTION_LABELS: Record<Resolution, string> = {
 export const SOURCE_LABELS: Record<Source, string> = {
   cam: "CAM",
   telesync: "TS",
+  telecine: "TC",
   screener: "Screener",
   dvd: "DVD",
   hdtv: "HDTV",
@@ -101,7 +110,9 @@ export const DEFAULT_MOVIE_PROFILE: QualityProfile = {
   maxSizeGb: 0,
   minSizeMb: 0,
   requiredWords: [],
-  bannedWords: ["cam", "hdcam", "telesync", "hdts", "screener"],
+  // Belt and braces alongside the source filter, for anyone who clears it.
+  // Safe as whole words: "tc" no longer matches "Catch" or "The Watch".
+  bannedWords: ["cam", "hdcam", "telesync", "hdts", "telecine", "tc", "screener"],
   preferredWords: [],
   allowSeasonPacks: false,
 };

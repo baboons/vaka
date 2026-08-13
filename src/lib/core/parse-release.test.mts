@@ -99,9 +99,35 @@ test("normalizes punctuation-heavy titles to a comparable form", () => {
   assert.equal(normalizeTitle("It's Always Sunny & Co"), "itsalwayssunnyandco");
 });
 
-test("detects low quality sources for banning", () => {
-  const cam = parseRelease("New.Movie.2025.HDCAM.x264-GRP");
-  assert.equal(cam.source, "cam");
-  const ts = parseRelease("New.Movie.2025.HDTS.720p.x264-GRP");
-  assert.equal(ts.source, "telesync");
+test("detects the whole pre-retail family, however it is abbreviated", () => {
+  const cases: Array<[string, string]> = [
+    ["New.Movie.2025.HDCAM.x264-GRP", "cam"],
+    ["New.Movie.2025.CAMRip.x264-GRP", "cam"],
+    ["New.Movie.2025.HDTS.720p.x264-GRP", "telesync"],
+    ["New.Movie.2025.TELESYNC.1080p-GRP", "telesync"],
+    ["New.Movie.2025.PDVD.x264-GRP", "telesync"],
+    // The one that got through: tagged only "TC", with a 1080p label.
+    ["Spider-Man Brand New Day (2026) 1080p V3 TC x264 - NoMore Releases", "telecine"],
+    ["New.Movie.2025.HDTC.1080p.x264-GRP", "telecine"],
+    ["New.Movie.2025.TELECINE.x264-GRP", "telecine"],
+    ["New.Movie.2025.DVDSCR.x264-GRP", "screener"],
+    ["New.Movie.2025.R5.x264-GRP", "screener"],
+  ];
+
+  for (const [title, expected] of cases) {
+    assert.equal(parseRelease(title).source, expected, title);
+  }
+});
+
+test("does not mistake ordinary titles for cinema rips", () => {
+  // "TC" and "TS" only count as their own token, not inside a word.
+  assert.equal(parseRelease("The.Watch.2012.1080p.BluRay.x264-GRP").source, "bluray");
+  assert.equal(parseRelease("Catch.Me.If.You.Can.2002.1080p.WEB-DL-GRP").source, "webdl");
+  assert.equal(parseRelease("Ghosts.S01E01.1080p.WEB-DL-GRP").source, "webdl");
+  assert.equal(parseRelease("Camden.2024.1080p.WEBRip-GRP").source, "webrip");
+});
+
+test("a real source still wins over a stray marker", () => {
+  assert.equal(parseRelease("Movie.2024.2160p.UHD.BluRay.REMUX.HDR-GRP").source, "remux");
+  assert.equal(parseRelease("Movie.2024.1080p.AMZN.WEB-DL.DDP5.1-GRP").source, "webdl");
 });

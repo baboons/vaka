@@ -245,7 +245,7 @@ export function QualityEditor({
                 onChange={(event) => patch({ requiredWords: textToWords(event.target.value) })}
               />
             </Field>
-            <Field label="Never contain" hint="Comma separated.">
+            <Field label="Never contain" hint="Comma separated, matched as whole words.">
               <Input
                 value={wordsToText(value.bannedWords)}
                 placeholder="e.g. cam, hdts"
