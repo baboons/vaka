@@ -43,8 +43,8 @@ rather than a low score — `UFC 330` is never filed as `UFC 331`.
 
 The scoring allows for what actually trips this up: a night game that rolls
 past midnight UTC is one day out rather than a mismatch, a race weekend is
-tagged with any of its three days, and "Australian" and "Australia" are the
-same place.
+tagged with any of its three days, and a place matches its own adjective
+("Coastland" and "Coastlands" are the same place).
 
 Switch on **Download uncertain matches too** if you would rather have the best
 guess than be asked. It is off by default: downloading the wrong game is worse
@@ -63,7 +63,7 @@ week or two is usually enough, longer if your feeds are slow.
 Events are grouped by competition and then by year:
 
 ```
-/media/Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Garry.mkv
+/media/Sports/Title Fight/2026/Title Fight - 2026-08-15 - 330 Barrow vs Ashgrove.mkv
 ```
 
 Plex reads sports best as a personal-media or *Other Videos* library. The

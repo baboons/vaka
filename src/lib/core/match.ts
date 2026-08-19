@@ -75,7 +75,7 @@ export function findMedia(
   if (direct) direct.forEach((m) => candidates.add(m));
 
   // The parser splits a trailing year off the title; a show whose canonical
-  // name includes that year ("Doctor Who 2005") is indexed under both.
+  // name includes that year ("Night Signal 2005") is indexed under both.
   if (parsed.year) {
     const withYear = index.get(`${parsed.normalizedTitle}${parsed.year}`);
     if (withYear) withYear.forEach((m) => candidates.add(m));
@@ -86,8 +86,8 @@ export function findMedia(
   const list = [...candidates];
 
   // A release carrying season/episode markers belongs to a show, and one
-  // without them to a movie. This is what keeps "Fargo" the film apart from
-  // "Fargo" the series when both are in the library.
+  // without them to a movie. This is what keeps "Ironwood" the film apart from
+  // "Ironwood" the series when both are in the library.
   const wantedKind = parsed.looksLikeMovie ? "movie" : "tv";
   const byKind = list.filter((m) => m.kind === wantedKind);
   const pool = byKind.length ? byKind : list;
@@ -109,8 +109,8 @@ export function findMedia(
  * Whether a release title contains a word, as a *word*.
  *
  * Substring matching looks equivalent and is not: banning "tc" would throw away
- * "The Watch" and "Catch Me", and banning "cam" would throw away anything with
- * "Cameron" in the title. Both ends are anchored to a non-alphanumeric
+ * "Hatchling Cove" and "Catch Me", and banning "cam" would throw away anything with
+ * "Camellia" in the title. Both ends are anchored to a non-alphanumeric
  * boundary, on a separator-normalized copy so "web dl" still matches "WEB-DL".
  */
 function containsWord(haystack: string, word: string): boolean {

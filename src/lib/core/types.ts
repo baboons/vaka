@@ -128,7 +128,7 @@ export const DEFAULT_MOVIE_PROFILE: QualityProfile = {
   minSizeMb: 0,
   requiredWords: [],
   // Belt and braces alongside the source filter, for anyone who clears it.
-  // Safe as whole words: "tc" no longer matches "Catch" or "The Watch".
+  // Safe as whole words: "tc" no longer matches "Catch" or "Hatchling Cove".
   bannedWords: ["cam", "hdcam", "telesync", "hdts", "telecine", "tc", "screener"],
   preferredWords: [],
   allowSeasonPacks: false,
@@ -230,7 +230,7 @@ export interface SportEventMeta {
  * A competition someone follows, stored on the media row.
  *
  * `teams` is the difference between following the NHL (1,300 games a season)
- * and following the Bruins. It filters at sync time, so unfollowed fixtures
+ * and following the Harriers. It filters at sync time, so unfollowed fixtures
  * are never written to the database at all.
  */
 export interface SportSubscription {

@@ -5,9 +5,9 @@
 Vaka can take finished downloads and put them where Plex expects them:
 
 ```
-/media/TV/The Bear (2022)/Season 03/The Bear (2022) - S03E01 - Tomorrow.mkv
-/media/Movies/Dune Part Two (2024)/Dune Part Two (2024).mkv
-/media/Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Garry.mkv
+/media/TV/Harbour Lights (2022)/Season 03/Harbour Lights (2022) - S03E01 - Low Tide.mkv
+/media/Movies/Deep Field Part Two (2024)/Deep Field Part Two (2024).mkv
+/media/Sports/Title Fight/2026/Title Fight - 2026-08-15 - 330 Barrow vs Ashgrove.mkv
 ```
 
 Season folders are created when missing, subtitles travel with their video, and

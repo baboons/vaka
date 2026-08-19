@@ -98,7 +98,7 @@ not sure enough that it is the right event — see
 ```bash
 pnpm run doctor                     # config check, then every download explained
 pnpm run doctor --now               # ...and scan right away
-pnpm run doctor --retry "Ted Lasso" # forget a record so it is tried again
+pnpm run doctor --retry "Tidewater" # forget a record so it is tried again
 ```
 
 `doctor` prints whether importing is on, whether each library folder is set and
@@ -140,4 +140,4 @@ pnpm lint
 
 ## License
 
-[MIT](LICENSE) © Johan
+[MIT](LICENSE)

@@ -65,7 +65,7 @@ test("a skipped download is retried, because the reason may no longer hold", () 
 
   // Recorded while the TV library folder was still unset.
   repo.recordImport(
-    { sourceKey: key, name: "Ted.Lasso.S04E02", status: "skipped", detail: "no TV library folder is configured" },
+    { sourceKey: key, name: "Tidewater.S04E02", status: "skipped", detail: "no TV library folder is configured" },
     db,
   );
 
@@ -77,7 +77,7 @@ test("a download still being written is retried rather than written off", () => 
   const key = "transmission:half-written";
 
   repo.recordImport(
-    { sourceKey: key, name: "Ted.Lasso.S04E01.REPACK", status: "skipped", detail: "no video files found" },
+    { sourceKey: key, name: "Tidewater.S04E01.REPACK", status: "skipped", detail: "no video files found" },
     db,
   );
   assert.equal(repo.wasImported(key, db), false);
@@ -108,7 +108,7 @@ test("an adopted back-catalogue download is left alone for good", () => {
   repo.recordImport(
     {
       sourceKey: key,
-      name: "Moonwalker.1988.1080p.BluRay.x264-OFT",
+      name: "Nightrunner.1988.1080p.BluRay.x264-OFT",
       status: "adopted",
       detail: "already complete when Vaka was connected",
     },

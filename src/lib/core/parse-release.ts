@@ -2,7 +2,7 @@
  * Scene release name parser.
  *
  * Feed items arrive as a single string like
- *   "The.Expanse.S05E03.1080p.WEB-DL.DDP5.1.H.264-NTb"
+ *   "Northwind.S05E03.1080p.WEB-DL.DDP5.1.H.264-NOVA"
  * and every downstream decision (which show, which episode, good enough
  * quality?) is made from what we can pull out of it here.
  */
@@ -14,7 +14,7 @@ import {
   type Source,
 } from "./types";
 
-/** Strip punctuation and case so "Marvel's S.H.I.E.L.D." == "marvels shield". */
+/** Strip punctuation and case so "Nadia's S.T.O.R.M." == "nadiasstorm". */
 export function normalizeTitle(input: string): string {
   return input
     .toLowerCase()
@@ -85,7 +85,7 @@ const VERBOSE = /\bseason[\s._-]*(\d{1,3})[\s._-]*episode[\s._-]*(\d{1,4})\b/i;
 /**
  * Season pack: `S01`, `Season 1`, `Series 2` with no episode marker.
  * The bare `s` form requires digits immediately after it so that a movie like
- * "Ocean's 8" is not read as season 8, and the lookahead only rejects a real
+ * "Harbour's 9" is not read as season 9, and the lookahead only rejects a real
  * episode marker (`S03E01`) rather than any following digit (`S03.1080p`).
  */
 const SEASON_ONLY =
@@ -154,12 +154,12 @@ function titleBoundary(s: string, episodeIndex: number | null): number {
   return candidates.length ? Math.min(...candidates) : s.length;
 }
 
-/** Pull a trailing year out of the title portion, e.g. "Dune 2021". */
+/** Pull a trailing year out of the title portion, e.g. "Northwind 2021". */
 function extractYear(titlePart: string): { title: string; year: number | null } {
   const matches = [...titlePart.matchAll(YEAR)];
   if (!matches.length) return { title: titlePart, year: null };
 
-  // Prefer the last year — "Blade Runner 2049 2017" keeps 2017 as the year.
+  // Prefer the last year — "Skyline 2049 2017" keeps 2017 as the year.
   const last = matches[matches.length - 1];
   const year = Number(last[1]);
   const now = new Date().getUTCFullYear();

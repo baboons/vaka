@@ -60,10 +60,10 @@ function dayNumber(value: string): number | null {
 /**
  * Whether a release names this subject.
  *
- * The prefix rule is what makes "Australian" match an Australia group and
- * "Japanese" match Japan, without the demonym table that this kind of
- * matching otherwise turns into. Five characters is enough shared prefix to
- * be safe; below that, only an exact word counts.
+ * The prefix rule is what lets a release name a place by its adjective —
+ * "Coastlands" matching a Coastland group — without the demonym table that
+ * this kind of matching otherwise turns into. Five characters is enough
+ * shared prefix to be safe; below that, only an exact word counts.
  */
 function groupMatches(normalized: string, group: string[]): boolean {
   const releaseWords = normalized.split(" ");

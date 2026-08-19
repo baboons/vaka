@@ -71,13 +71,13 @@ test("matches the same title across providers via its IMDb id", () => {
 
 test("matches a Cinemeta-tracked movie whose providerId is the IMDb id", () => {
   const library = [
-    media({ kind: "movie", provider: "cinemeta", providerId: "tt15239678", title: "Dune: Part Two", year: 2024 }),
+    media({ kind: "movie", provider: "cinemeta", providerId: "tt9900001", title: "Deep Field: Part Two", year: 2024 }),
   ];
   const item = found({
     kind: "movie",
-    providerId: "tt15239678",
+    providerId: "tt9900001",
     imdbId: null,
-    title: "Dune: Part Two",
+    title: "Deep Field: Part Two",
     year: 2024,
   });
   assert.equal(isTracked(item, library), true);
@@ -98,14 +98,14 @@ test("falls back to title and year when no ids line up", () => {
 });
 
 test("keeps a film and a series of the same name apart", () => {
-  const library = [media({ kind: "tv", title: "Fargo", year: 2014, imdbId: "tt2802850" })];
-  const film = found({ kind: "movie", title: "Fargo", year: 1996, imdbId: "tt0116282" });
+  const library = [media({ kind: "tv", title: "Ironwood", year: 2014, imdbId: "tt2802850" })];
+  const film = found({ kind: "movie", title: "Ironwood", year: 1996, imdbId: "tt0116282" });
   assert.equal(isTracked(film, library), false);
 });
 
 test("does not hide something merely similar", () => {
-  const library = [media({ title: "The Bear", year: 2022 })];
-  assert.equal(isTracked(found({ title: "The Bear Hunt", year: 2022, imdbId: null }), library), false);
+  const library = [media({ title: "Harbour Lights", year: 2022 })];
+  assert.equal(isTracked(found({ title: "Harbour Lights Hunt", year: 2022, imdbId: null }), library), false);
 });
 
 test("an empty library hides nothing", () => {

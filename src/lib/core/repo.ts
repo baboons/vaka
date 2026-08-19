@@ -165,7 +165,7 @@ export interface NewMedia {
   sport?: SportSubscription | null;
 }
 
-/** Strips a leading article so "The Bear" sorts under B. */
+/** Strips a leading article so "Harbour Lights" sorts under B. */
 export function sortTitleOf(title: string): string {
   return title.toLowerCase().replace(/^(the|a|an)\s+/, "").trim();
 }

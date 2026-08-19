@@ -28,7 +28,7 @@ function profile(overrides: Partial<QualityProfile> = {}): QualityProfile {
 
 test("rejects a cinema rip when the profile does not accept that source", () => {
   const parsed = parseRelease(
-    "Spider-Man Brand New Day (2026) 1080p V3 TC x264 - NoMore Releases - Dutch Sub",
+    "Skyline Rising (2026) 1080p V3 TC x264 - Driftwood Releases - Dutch Sub",
   );
   const verdict = evaluateQuality(
     profile({ sources: ["remux", "bluray", "webdl", "webrip"] }),
@@ -55,10 +55,10 @@ test("banned words match whole words, not substrings", () => {
 
   // The ones a substring match would have destroyed.
   for (const title of [
-    "The.Watch.2012.1080p.BluRay.x264-GRP",
-    "Catch.Me.If.You.Can.2002.1080p.WEB-DL-GRP",
-    "Camden.2024.1080p.WEBRip-GRP",
-    "Cameron.Diaz.Doc.2024.1080p.WEB-DL-GRP",
+    "Hatchling.Cove.2012.1080p.BluRay.x264-GRP",
+    "Catchwater.Bay.2002.1080p.WEB-DL-GRP",
+    "Camborne.2024.1080p.WEBRip-GRP",
+    "Camellia.Gardens.Doc.2024.1080p.WEB-DL-GRP",
   ]) {
     assert.equal(
       evaluateQuality(banned, parseRelease(title), item).ok,

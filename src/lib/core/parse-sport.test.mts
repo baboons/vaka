@@ -12,7 +12,7 @@ import test from "node:test";
 import { parseSportRelease } from "./parse-sport";
 
 test("reads a numbered fight card", () => {
-  const r = parseSportRelease("UFC.319.PPV.Du.Plessis.vs.Chimaev.1080p.WEB.DL.H264.Fight-BB");
+  const r = parseSportRelease("UFC.319.PPV.Calder.vs.Ellery.1080p.WEB.DL.H264.Fight-BB");
   assert.equal(r.league?.id, "ufc");
   assert.equal(r.eventNumber, 319);
   assert.equal(r.session, "main-card");
@@ -38,13 +38,13 @@ test("a Fight Night number is not an event number", () => {
   const numbered = parseSportRelease("UFC.319.Prelims.1080p.WEB-DL-GRP");
   assert.equal(numbered.eventNumber, 319);
 
-  const fightNight = parseSportRelease("UFC.Fight.Night.245.Gamrot.vs.Salkilld.WEB.DL-GRP");
+  const fightNight = parseSportRelease("UFC.Fight.Night.245.Dunmore.vs.Fenwick.WEB.DL-GRP");
   assert.equal(fightNight.league?.id, "ufc");
   assert.equal(fightNight.eventNumber, null);
 });
 
 test("a year after the competition name is not an event number", () => {
-  const r = parseSportRelease("Formula1.2026.Australian.Grand.Prix.Race.SkyF1HD.1080p50");
+  const r = parseSportRelease("Formula1.2026.Coastal.Grand.Prix.Race.1080p50");
   assert.equal(r.league?.id, "f1");
   assert.equal(r.eventNumber, null);
   assert.equal(r.year, 2026);
@@ -56,28 +56,28 @@ test("F1 Academy and Formula E are not Formula 1", () => {
   assert.equal(parseSportRelease("F1.Academy.2026.Round.1.Race.1.1080p").league, null);
   assert.equal(parseSportRelease("Formula.E.2026.Mexico.City.EPrix.1080p").league, null);
   assert.equal(
-    parseSportRelease("Formula1.2026.Japanese.Grand.Prix.Race.1080p").league?.id,
+    parseSportRelease("Formula1.2026.Lakeside.Grand.Prix.Race.1080p").league?.id,
     "f1",
   );
 });
 
 test("reads dates from league fixtures", () => {
-  const epl = parseSportRelease("EPL.2026.08.21.Coventry.City.vs.Arsenal.1080p.WEB.h264-GRP");
+  const epl = parseSportRelease("EPL.2026.08.21.Westford.City.vs.Eastport.1080p.WEB.h264-GRP");
   assert.equal(epl.league?.id, "eng.1");
   assert.equal(epl.date, "2026-08-21");
 
-  const nhl = parseSportRelease("NHL.RS.2026.03.10.Kings.vs.Bruins.720p60.WEB.h264-GRP");
+  const nhl = parseSportRelease("NHL.RS.2026.03.10.Falcons.vs.Harriers.720p60.WEB.h264-GRP");
   assert.equal(nhl.league?.id, "nhl");
   assert.equal(nhl.date, "2026-03-10");
 });
 
 test("recognises the long form of a league name", () => {
   assert.equal(
-    parseSportRelease("Premier.League.2026.08.22.Man.United.vs.Hull.City.720p.HDTV").league?.id,
+    parseSportRelease("Premier.League.2026.08.22.Kingsway.vs.Redhill.City.720p.HDTV").league?.id,
     "eng.1",
   );
   assert.equal(
-    parseSportRelease("UEFA.Champions.League.2026.09.16.Arsenal.vs.Bayern.1080p").league?.id,
+    parseSportRelease("UEFA.Champions.League.2026.09.16.Eastport.vs.Portside.1080p").league?.id,
     "uefa.champions",
   );
 });
@@ -92,12 +92,12 @@ test("the longest matching name wins", () => {
 test("spots the parts nobody means by 'get me the fight'", () => {
   const cases: Array<[string, string]> = [
     ["UFC.319.Extended.Highlights.1080p.WEB-DL-GRP", "highlights"],
-    ["NHL.2026.03.10.Kings.vs.Bruins.Condensed.Game.720p", "highlights"],
+    ["NHL.2026.03.10.Falcons.vs.Harriers.Condensed.Game.720p", "highlights"],
     ["UFC.319.Weigh.Ins.1080p.WEB-DL-GRP", "extra"],
     ["UFC.319.Press.Conference.1080p.WEB-DL-GRP", "extra"],
-    ["Formula1.2026.Australian.GP.Qualifying.1080p", "qualifying"],
-    ["Formula1.2026.Australian.GP.FP2.1080p", "practice"],
-    ["Formula1.2026.Miami.GP.Sprint.1080p", "sprint"],
+    ["Formula1.2026.Coastal.GP.Qualifying.1080p", "qualifying"],
+    ["Formula1.2026.Coastal.GP.FP2.1080p", "practice"],
+    ["Formula1.2026.Harbour.GP.Sprint.1080p", "sprint"],
   ];
 
   for (const [title, session] of cases) {
@@ -106,16 +106,16 @@ test("spots the parts nobody means by 'get me the fight'", () => {
 });
 
 test("a release that says nothing about the part is the event itself", () => {
-  const r = parseSportRelease("NHL.2026.03.10.Kings.vs.Bruins.1080p.WEB-DL-GRP");
+  const r = parseSportRelease("NHL.2026.03.10.Falcons.vs.Harriers.1080p.WEB-DL-GRP");
   assert.equal(r.session, "full-event");
   assert.equal(r.sessionStated, false);
 });
 
 test("ordinary television is not mistaken for sport", () => {
   for (const title of [
-    "The.Expanse.S05E03.1080p.WEB-DL.DDP5.1.H.264-NTb",
-    "Dune.Part.Two.2024.2160p.WEB-DL-FLUX",
-    "Ted.Lasso.S04E02.1080p.WEB-DL-GRP",
+    "Northwind.S05E03.1080p.WEB-DL.DDP5.1.H.264-NOVA",
+    "Deep.Field.Part.Two.2024.2160p.WEB-DL-ZEPH",
+    "Tidewater.S04E02.1080p.WEB-DL-GRP",
   ]) {
     assert.equal(parseSportRelease(title).league, null, title);
   }

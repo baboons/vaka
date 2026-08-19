@@ -255,7 +255,7 @@ export function QualityEditor({
             <Field label="Prefer" hint="Scored higher, never required.">
               <Input
                 value={wordsToText(value.preferredWords)}
-                placeholder="e.g. NTb, FLUX"
+                placeholder="e.g. NOVA, ZEPH"
                 onChange={(event) => patch({ preferredWords: textToWords(event.target.value) })}
               />
             </Field>

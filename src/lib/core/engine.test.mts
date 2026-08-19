@@ -29,15 +29,15 @@ const { DEFAULT_MOVIE_PROFILE, DEFAULT_TV_PROFILE } = await import("./types");
 const TORRENT_BODY = Buffer.from("d8:announce9:test:onee");
 
 const RELEASES = [
-  "The.Expanse.S05E03.1080p.WEB-DL.DDP5.1.H.264-NTb",
-  "The.Expanse.S05E04.480p.HDTV.x264-LOWQ",
-  "The.Expanse.S05E05.1080p.WEB-DL.x264-NTb",
+  "Northwind.S05E03.1080p.WEB-DL.DDP5.1.H.264-NOVA",
+  "Northwind.S05E04.480p.HDTV.x264-LOWQ",
+  "Northwind.S05E05.1080p.WEB-DL.x264-NOVA",
   "Some.Show.Nobody.Follows.S01E01.1080p.WEB-DL-GRP",
   // The 1080p copy is listed first on purpose: the preferred 2160p must still
   // win, which only happens if candidates are ranked rather than taken in
   // feed order.
-  "Dune.Part.Two.2024.1080p.WEB-DL.H.264-FLUX",
-  "Dune.Part.Two.2024.2160p.WEB-DL.DV.HDR.H.265-FLUX",
+  "Deep.Field.Part.Two.2024.1080p.WEB-DL.H.264-ZEPH",
+  "Deep.Field.Part.Two.2024.2160p.WEB-DL.DV.HDR.H.265-ZEPH",
   "Totally.Unrelated.Movie.2019.1080p.BluRay.x264-GRP",
 ];
 
@@ -118,7 +118,7 @@ before(async () => {
       kind: "tv",
       provider: "tvmaze",
       providerId: "1",
-      title: "The Expanse",
+      title: "Northwind",
       year: 2015,
       quality: { ...DEFAULT_TV_PROFILE, allowed: ["720p", "1080p"], preferred: "1080p" },
     },
@@ -141,7 +141,7 @@ before(async () => {
       kind: "movie",
       provider: "tmdb",
       providerId: "693134",
-      title: "Dune Part Two",
+      title: "Deep Field Part Two",
       year: 2024,
       quality: {
         ...DEFAULT_MOVIE_PROFILE,
@@ -182,8 +182,8 @@ test("grabs wanted episodes and writes .torrent files to the TV folder", async (
   assert.deepEqual(
     files.sort(),
     [
-      "The.Expanse.S05E03.1080p.WEB-DL.DDP5.1.H.264-NTb.torrent",
-      "The.Expanse.S05E05.1080p.WEB-DL.x264-NTb.torrent",
+      "Northwind.S05E03.1080p.WEB-DL.DDP5.1.H.264-NOVA.torrent",
+      "Northwind.S05E05.1080p.WEB-DL.x264-NOVA.torrent",
     ],
     "only the 1080p episodes should land on disk, directly in the watch folder",
   );
@@ -199,7 +199,7 @@ test("grabs wanted episodes and writes .torrent files to the TV folder", async (
 test("puts movies in their own folder using the movie quality profile", async () => {
   const files = await fs.readdir(movieDir);
   assert.deepEqual(files, [
-    "Dune.Part.Two.2024.2160p.WEB-DL.DV.HDR.H.265-FLUX.torrent",
+    "Deep.Field.Part.Two.2024.2160p.WEB-DL.DV.HDR.H.265-ZEPH.torrent",
   ]);
 });
 
@@ -212,7 +212,7 @@ test("takes the preferred quality even when a lesser release is listed first", a
   // down for the release that was actually preferred.
   const rejected = repo
     .listHistory({ event: "rejected" })
-    .find((row) => row.title?.includes("Dune.Part.Two.2024.1080p"));
+    .find((row) => row.title?.includes("Deep.Field.Part.Two.2024.1080p"));
   assert.ok(rejected, "the weaker duplicate should be recorded as rejected");
   assert.match(rejected.reason ?? "", /already have 2160p/);
 });

@@ -18,8 +18,8 @@ already follow — edit a title under its **Quality** tab.
   into CAM, TS, TC and Screener, each recognised by every abbreviation in
   common use. A source that cannot be identified is allowed through.
 - **Seeders, size limits, word filters** — must contain / never contain /
-  prefer. Matched as whole words, so banning `tc` does not throw away *The
-  Watch*.
+  prefer. Matched as whole words, so banning `tc` does not throw away
+  *Hatchling Cove*.
 - **Season packs** (TV) — off by default.
 
 ## Matching a title

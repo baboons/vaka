@@ -23,7 +23,7 @@ const { DEFAULT_MOVIE_PROFILE, DEFAULT_TV_PROFILE } = await import("./types");
 let server: http.Server;
 let baseUrl: string;
 
-/** Episodes the pretend Plex server holds for The Bear. */
+/** Episodes the pretend Plex server holds for Harbour Lights. */
 const PLEX_EPISODES = [
   { parentIndex: 1, index: 1, Media: [{ videoResolution: "1080" }] },
   { parentIndex: 1, index: 2, Media: [{ videoResolution: "4k" }] },
@@ -68,9 +68,9 @@ before(async () => {
           Metadata: [
             {
               ratingKey: "900",
-              title: "Dune: Part Two",
+              title: "Deep Field: Part Two",
               year: 2024,
-              Guid: [{ id: "imdb://tt15239678" }, { id: "tmdb://693134" }],
+              Guid: [{ id: "imdb://tt9900001" }, { id: "tmdb://693134" }],
               Media: [{ videoResolution: "4k" }],
             },
             {
@@ -94,7 +94,7 @@ before(async () => {
           Metadata: [
             {
               ratingKey: "500",
-              title: "The Bear",
+              title: "Harbour Lights",
               year: 2022,
               Guid: [{ id: "tvdb://136500" }],
             },
@@ -129,7 +129,7 @@ before(async () => {
       provider: "tvmaze",
       providerId: "1",
       tvdbId: "136500",
-      title: "The Bear",
+      title: "Harbour Lights",
       year: 2022,
       quality: DEFAULT_TV_PROFILE,
     },
@@ -151,8 +151,8 @@ before(async () => {
     {
       kind: "movie",
       provider: "cinemeta",
-      providerId: "tt15239678",
-      title: "Dune: Part Two",
+      providerId: "tt9900001",
+      title: "Deep Field: Part Two",
       year: 2024,
       quality: DEFAULT_MOVIE_PROFILE,
     },
@@ -192,8 +192,8 @@ after(async () => {
 });
 
 test("reads external ids from both modern and legacy Plex guids", () => {
-  assert.deepEqual(plex.externalIds({ Guid: [{ id: "imdb://tt15239678" }] }), {
-    imdb: "tt15239678",
+  assert.deepEqual(plex.externalIds({ Guid: [{ id: "imdb://tt9900001" }] }), {
+    imdb: "tt9900001",
   });
   assert.deepEqual(
     plex.externalIds({ guid: "com.plexapp.agents.thetvdb://136500/1/1?lang=en" }),
@@ -244,9 +244,9 @@ test("crosses off episodes Plex already has, and leaves the rest wanted", async 
 test("matches movies by external id and by title+year", async () => {
   const movies = repo.listMedia({ kind: "movie" });
 
-  const dune = movies.find((movie) => movie.title.startsWith("Dune"));
-  assert.equal(dune?.state, "done", "matched on its IMDb id");
-  assert.match(dune?.grabbedQuality ?? "", /2160p/);
+  const deepField = movies.find((movie) => movie.title.startsWith("Deep Field"));
+  assert.equal(deepField?.state, "done", "matched on its IMDb id");
+  assert.match(deepField?.grabbedQuality ?? "", /2160p/);
 
   const old = movies.find((movie) => movie.title === "Some Old Film");
   assert.equal(old?.state, "done", "matched on title and year");

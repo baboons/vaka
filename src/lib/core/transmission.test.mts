@@ -24,7 +24,7 @@ const TORRENTS = [
   {
     id: 1,
     hashString: "aaa",
-    name: "The.Bear.S03E01.1080p.WEB-DL.x264-NTb",
+    name: "Harbour.Lights.S03E01.1080p.WEB-DL.x264-NOVA",
     percentDone: 1,
     status: 6,
     isFinished: false,
@@ -46,7 +46,7 @@ const TORRENTS = [
   {
     id: 3,
     hashString: "ccc",
-    name: "Dune.Part.Two.2024.2160p",
+    name: "Deep.Field.Part.Two.2024.2160p",
     percentDone: 1,
     status: 0,
     isFinished: true,
@@ -239,9 +239,9 @@ test("explains where a torrent stands", () => {
 
 test("proposes padded seasons and years when the library uses them", async () => {
   const root = path.join(tempRoot, "plexish");
-  await fs.mkdir(path.join(root, "The Bear (2022)", "Season 01"), { recursive: true });
-  await fs.mkdir(path.join(root, "Severance (2022)", "Season 02"), { recursive: true });
-  await fs.mkdir(path.join(root, "Silo (2023)", "Season 01"), { recursive: true });
+  await fs.mkdir(path.join(root, "Harbour Lights (2022)", "Season 01"), { recursive: true });
+  await fs.mkdir(path.join(root, "Glasshouse (2022)", "Season 02"), { recursive: true });
+  await fs.mkdir(path.join(root, "Beacon (2023)", "Season 01"), { recursive: true });
 
   const report = await inspectLibrary("tv", root);
 
@@ -256,7 +256,7 @@ test("proposes padded seasons and years when the library uses them", async () =>
 
 test("matches an existing library that uses unpadded seasons and no years", async () => {
   const root = path.join(tempRoot, "custom");
-  for (const show of ["The Bear", "Severance", "Silo"]) {
+  for (const show of ["Harbour Lights", "Glasshouse", "Beacon"]) {
     await fs.mkdir(path.join(root, show, "Season 1"), { recursive: true });
     await fs.mkdir(path.join(root, show, "Season 2"), { recursive: true });
   }
@@ -271,9 +271,9 @@ test("matches an existing library that uses unpadded seasons and no years", asyn
 
 test("recognises the S01 style", async () => {
   const root = path.join(tempRoot, "sxx");
-  await fs.mkdir(path.join(root, "The Bear (2022)", "S01"), { recursive: true });
-  await fs.mkdir(path.join(root, "Silo (2023)", "S02"), { recursive: true });
-  await fs.mkdir(path.join(root, "Severance (2022)", "S01"), { recursive: true });
+  await fs.mkdir(path.join(root, "Harbour Lights (2022)", "S01"), { recursive: true });
+  await fs.mkdir(path.join(root, "Beacon (2023)", "S02"), { recursive: true });
+  await fs.mkdir(path.join(root, "Glasshouse (2022)", "S01"), { recursive: true });
 
   const report = await inspectLibrary("tv", root);
   assert.equal(report.proposed.season, "S{season:00}");

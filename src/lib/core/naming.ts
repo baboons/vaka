@@ -4,9 +4,9 @@
  * Plex infers everything from the path, so the templates below are the whole
  * contract:
  *
- *   TV      /TV/The Bear (2022)/Season 03/The Bear (2022) - S03E01 - Title.mkv
- *   Movies  /Movies/Dune Part Two (2024)/Dune Part Two (2024).mkv
- *   Sports  /Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Garry.mkv
+ *   TV      /TV/Harbour Lights (2022)/Season 03/Harbour Lights (2022) - S03E01 - Title.mkv
+ *   Movies  /Movies/Deep Field Part Two (2024)/Deep Field Part Two (2024).mkv
+ *   Sports  /Sports/Title Fight/2026/Title Fight - 2026-08-15 - 330 Barrow.mkv
  *
  * Templates are stored in settings rather than hardcoded, because plenty of
  * libraries have their own long-standing convention and renaming an existing
@@ -18,7 +18,7 @@ import path from "node:path";
 import type { MediaKind } from "./types";
 
 export interface NamingTemplates {
-  /** Folder for the title itself, e.g. "The Bear (2022)". */
+  /** Folder for the title itself, e.g. "Harbour Lights (2022)". */
   folder: string;
   /** Grouping folder inside the title: "Season 03", or a year for sports. */
   season: string;
@@ -45,7 +45,7 @@ export const PLEX_MOVIE_TEMPLATES: NamingTemplates = {
  * events, and because a competition's own titles repeat ("Fight Night") in a
  * way episode titles do not.
  *
- *   /Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Machado Garry.mkv
+ *   /Sports/Title Fight/2026/Title Fight - 2026-08-15 - 330 Barrow vs Ashgrove.mkv
  */
 export const PLEX_SPORT_TEMPLATES: NamingTemplates = {
   folder: "{title}",
@@ -99,8 +99,8 @@ function pad(value: number, width: number): string {
  *         {episodeTitle} {airDate} {quality} {group}
  *
  * A token with no value collapses, and any separator left stranded by that
- * collapse is tidied up — so a movie with no year yields "Dune Part Two", not
- * "Dune Part Two ()".
+ * collapse is tidied up — so a movie with no year yields "Deep Field Part Two", not
+ * "Deep Field Part Two ()".
  */
 export function renderTemplate(template: string, values: NamingValues): string {
   const rendered = template.replace(
@@ -212,28 +212,28 @@ export function previewDestination(
 ): string {
   const samples: Record<MediaKind, NamingValues> = {
     tv: {
-      title: "The Bear",
+      title: "Harbour Lights",
       year: 2022,
       season: 3,
       episode: 1,
-      episodeTitle: "Tomorrow",
+      episodeTitle: "Low Tide",
       quality: "1080p WEB-DL",
-      group: "NTb",
+      group: "NOVA",
     },
     movie: {
-      title: "Dune Part Two",
+      title: "Deep Field Part Two",
       year: 2024,
       quality: "2160p WEB-DL",
-      group: "FLUX",
+      group: "ZEPH",
     },
     sport: {
-      title: "UFC",
+      title: "Title Fight",
       season: 2026,
       episode: 12,
-      episodeTitle: "UFC 330 Makhachev vs Machado Garry",
+      episodeTitle: "330 Barrow vs Ashgrove",
       airDate: "2026-08-15",
       quality: "1080p WEB-DL",
-      group: "VERUM",
+      group: "ORBIT",
     },
   };
 

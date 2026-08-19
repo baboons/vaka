@@ -322,8 +322,8 @@ export interface SportEvent {
    * Ways to name the subjects of this event, one group per subject.
    *
    * Matching counts how many *groups* a release names, not how many strings,
-   * so "Bruins" and "Boston Bruins" and "BOS" all count once. Coverage across
-   * groups is what separates "the right game" from "a game involving Boston".
+   * so "Harriers" and "Eastport Harriers" and "BOS" all count once. Coverage across
+   * groups is what separates "the right game" from "a game involving Eastport".
    */
   identityGroups: string[][];
 }
@@ -419,7 +419,12 @@ const NOISE = new Set([
   "by",
 ]);
 
-/** Sponsor prefixes ESPN bolts onto race names, e.g. "Qatar Airways". */
+/**
+ * Sponsor prefixes ESPN bolts onto race names.
+ *
+ * Real sponsor names, because they are matched against real ESPN data — the
+ * point is to strip them back off again.
+ */
 const SPONSOR_WORDS = new Set([
   "qatar",
   "airways",
@@ -466,7 +471,7 @@ export function teamAliases(team: {
 /**
  * Read the subjects out of a card's title.
  *
- * "UFC 330: Makhachev vs. Machado Garry" describes two fighters; both the
+ * "UFC 330: Barrow vs. Ashgrove" describes two fighters; both the
  * full name and the surname are kept, because releases use either.
  */
 export function fighterGroups(name: string): string[][] {

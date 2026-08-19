@@ -6,9 +6,9 @@
  * names of whoever is playing, and which part of the broadcast this is:
  *
  *   UFC.330.Main.Card.1080p.WEB-DL.H264-GRP
- *   EPL.2026.08.21.Coventry.City.vs.Arsenal.1080p.HDTV
- *   Formula1.2026.Australian.GP.Race.SkyF1HD.1080p
- *   NHL.RS.2026.03.10.Kings.vs.Bruins.720p
+ *   EPL.2026.08.21.Westford.City.vs.Eastport.1080p.HDTV
+ *   Formula1.2026.Coastal.GP.Race.1080p
+ *   NHL.RS.2026.03.10.Falcons.vs.Harriers.720p
  *
  * None of those is reliable on its own, so this file only extracts; deciding
  * which event a release belongs to is scoring, and lives in `match-sport.ts`.

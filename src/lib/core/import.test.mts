@@ -57,7 +57,7 @@ before(async () => {
       kind: "tv",
       provider: "tvmaze",
       providerId: "1",
-      title: "The Bear",
+      title: "Harbour Lights",
       year: 2022,
       quality: DEFAULT_TV_PROFILE,
     },
@@ -65,7 +65,7 @@ before(async () => {
   );
   repo.upsertEpisodes(
     [
-      { mediaId: show.id, season: 3, number: 1, title: "Tomorrow", monitored: true },
+      { mediaId: show.id, season: 3, number: 1, title: "Low Tide", monitored: true },
       { mediaId: show.id, season: 3, number: 2, title: "Next", monitored: true },
       { mediaId: show.id, season: 10, number: 1, title: "Double", monitored: true },
       { mediaId: show.id, season: 10, number: 2, title: "Trouble", monitored: true },
@@ -77,8 +77,8 @@ before(async () => {
     {
       kind: "movie",
       provider: "cinemeta",
-      providerId: "tt15239678",
-      title: "Dune Part Two",
+      providerId: "tt9900001",
+      title: "Deep Field Part Two",
       year: 2024,
       quality: DEFAULT_MOVIE_PROFILE,
     },
@@ -100,12 +100,12 @@ test("renders Plex templates, padding seasons and episodes", () => {
     libraryDir: "/library/TV",
     templates,
     extension: ".mkv",
-    values: { title: "The Bear", year: 2022, season: 3, episode: 1, episodeTitle: "Tomorrow" },
+    values: { title: "Harbour Lights", year: 2022, season: 3, episode: 1, episodeTitle: "Low Tide" },
   });
 
   assert.equal(
     destination.relative,
-    path.join("The Bear (2022)", "Season 03", "The Bear (2022) - S03E01 - Tomorrow.mkv"),
+    path.join("Harbour Lights (2022)", "Season 03", "Harbour Lights (2022) - S03E01 - Low Tide.mkv"),
   );
 });
 
@@ -143,7 +143,7 @@ test("strips path separators so a release name cannot escape its folder", () => 
 });
 
 test("files an episode into Season NN, creating the folders", async () => {
-  const source = path.join(downloads, "The.Bear.S03E01.1080p.WEB-DL.x264-NTb.mkv");
+  const source = path.join(downloads, "Harbour.Lights.S03E01.1080p.WEB-DL.x264-NOVA.mkv");
   await makeFile(source);
 
   const outcome = await importPath(source, getDb(), { releaseName: path.basename(source) });
@@ -151,9 +151,9 @@ test("files an episode into Season NN, creating the folders", async () => {
 
   const expected = path.join(
     tvLibrary,
-    "The Bear (2022)",
+    "Harbour Lights (2022)",
     "Season 03",
-    "The Bear (2022) - S03E01 - Tomorrow.mkv",
+    "Harbour Lights (2022) - S03E01 - Low Tide.mkv",
   );
   const stat = await fs.stat(expected);
   assert.ok(stat.isFile());
@@ -161,16 +161,16 @@ test("files an episode into Season NN, creating the folders", async () => {
 });
 
 test("hardlinks rather than copying, so seeding continues and no space is used", async () => {
-  const source = path.join(downloads, "The.Bear.S03E02.1080p.WEB-DL.x264-NTb.mkv");
+  const source = path.join(downloads, "Harbour.Lights.S03E02.1080p.WEB-DL.x264-NOVA.mkv");
   await makeFile(source);
 
   await importPath(source, getDb(), { releaseName: path.basename(source) });
 
   const target = path.join(
     tvLibrary,
-    "The Bear (2022)",
+    "Harbour Lights (2022)",
     "Season 03",
-    "The Bear (2022) - S03E02 - Next.mkv",
+    "Harbour Lights (2022) - S03E02 - Next.mkv",
   );
 
   const [from, to] = await Promise.all([fs.stat(source), fs.stat(target)]);
@@ -186,18 +186,18 @@ test("marks the episode as had, so the watcher stops wanting it", () => {
 });
 
 test("puts a film in its own folder", async () => {
-  const source = path.join(downloads, "Dune.Part.Two.2024.2160p.WEB-DL.H.265-FLUX.mkv");
+  const source = path.join(downloads, "Deep.Field.Part.Two.2024.2160p.WEB-DL.H.265-ZEPH.mkv");
   await makeFile(source);
 
   await importPath(source, getDb(), { releaseName: path.basename(source) });
 
-  const expected = path.join(movieLibrary, "Dune Part Two (2024)", "Dune Part Two (2024).mkv");
+  const expected = path.join(movieLibrary, "Deep Field Part Two (2024)", "Deep Field Part Two (2024).mkv");
   assert.ok((await fs.stat(expected)).isFile());
   assert.equal(repo.listMedia({ kind: "movie" })[0].state, "done");
 });
 
 test("takes the episode from a folder-style download and ignores the sample", async () => {
-  const folder = path.join(downloads, "The.Bear.S10E01.1080p.WEB-DL.x264-NTb");
+  const folder = path.join(downloads, "Harbour.Lights.S10E01.1080p.WEB-DL.x264-NOVA");
   await makeFile(path.join(folder, "the.bear.s10e01.1080p.web-dl.x264-ntb.mkv"));
   await makeFile(path.join(folder, "Sample", "sample.mkv"), 2 * 1024 * 1024);
   await fs.writeFile(path.join(folder, "readme.nfo"), "notes");
@@ -207,15 +207,15 @@ test("takes the episode from a folder-style download and ignores the sample", as
   assert.equal(outcome.imported.length, 1, "only the feature file should be imported");
   const expected = path.join(
     tvLibrary,
-    "The Bear (2022)",
+    "Harbour Lights (2022)",
     "Season 10",
-    "The Bear (2022) - S10E01 - Double.mkv",
+    "Harbour Lights (2022) - S10E01 - Double.mkv",
   );
   assert.ok((await fs.stat(expected)).isFile());
 });
 
 test("carries matching subtitles across with the video", async () => {
-  const base = path.join(downloads, "The.Bear.S10E02.1080p.WEB-DL.x264-NTb");
+  const base = path.join(downloads, "Harbour.Lights.S10E02.1080p.WEB-DL.x264-NOVA");
   await makeFile(`${base}.mkv`);
   await fs.writeFile(`${base}.srt`, "1\n00:00:01,000 --> 00:00:02,000\nhello\n");
 
@@ -223,26 +223,26 @@ test("carries matching subtitles across with the video", async () => {
 
   const subtitle = path.join(
     tvLibrary,
-    "The Bear (2022)",
+    "Harbour Lights (2022)",
     "Season 10",
-    "The Bear (2022) - S10E02 - Trouble.srt",
+    "Harbour Lights (2022) - S10E02 - Trouble.srt",
   );
   assert.ok((await fs.stat(subtitle)).isFile());
 });
 
 test("never overwrites: a second copy lands beside the first", async () => {
-  const source = path.join(downloads, "second", "The.Bear.S03E01.2160p.WEB-DL.x265-NTb.mkv");
+  const source = path.join(downloads, "second", "Harbour.Lights.S03E01.2160p.WEB-DL.x265-NOVA.mkv");
   await makeFile(source);
 
   await importPath(source, getDb(), { releaseName: path.basename(source) });
 
-  const seasonDir = path.join(tvLibrary, "The Bear (2022)", "Season 03");
+  const seasonDir = path.join(tvLibrary, "Harbour Lights (2022)", "Season 03");
   const files = (await fs.readdir(seasonDir)).filter((name) => name.endsWith(".mkv")).sort();
 
   assert.deepEqual(files, [
-    "The Bear (2022) - S03E01 - Tomorrow (1).mkv",
-    "The Bear (2022) - S03E01 - Tomorrow.mkv",
-    "The Bear (2022) - S03E02 - Next.mkv",
+    "Harbour Lights (2022) - S03E01 - Low Tide (1).mkv",
+    "Harbour Lights (2022) - S03E01 - Low Tide.mkv",
+    "Harbour Lights (2022) - S03E02 - Next.mkv",
   ]);
 });
 
@@ -258,23 +258,23 @@ test("skips files that match nothing in the library, leaving them alone", async 
 });
 
 test("a dry run reports the plan and writes nothing", async () => {
-  const source = path.join(downloads, "dry", "The.Bear.S03E02.2160p.WEB-DL.x265-NTb.mkv");
+  const source = path.join(downloads, "dry", "Harbour.Lights.S03E02.2160p.WEB-DL.x265-NOVA.mkv");
   await makeFile(source);
 
-  const before = await fs.readdir(path.join(tvLibrary, "The Bear (2022)", "Season 03"));
+  const before = await fs.readdir(path.join(tvLibrary, "Harbour Lights (2022)", "Season 03"));
   const plan = await planImport(source, getDb(), { releaseName: path.basename(source) });
   const outcome = await runImport(plan, getDb(), { dryRun: true });
 
   assert.equal(outcome.imported.length, 1);
   assert.match(outcome.imported[0].relative, /Season 03/);
 
-  const after = await fs.readdir(path.join(tvLibrary, "The Bear (2022)", "Season 03"));
+  const after = await fs.readdir(path.join(tvLibrary, "Harbour Lights (2022)", "Season 03"));
   assert.deepEqual(after, before, "a dry run must not change the library");
 });
 
 test("move mode relocates the file instead of linking it", async () => {
   configure("move");
-  const source = path.join(downloads, "moved", "The.Bear.S10E02.720p.HDTV.x264-GRP.mkv");
+  const source = path.join(downloads, "moved", "Harbour.Lights.S10E02.720p.HDTV.x264-GRP.mkv");
   await makeFile(source);
 
   await importPath(source, getDb(), { releaseName: path.basename(source) });
@@ -289,14 +289,14 @@ test("recognises a download Vaka grabbed itself, however it is punctuated", () =
   repo.addHistory(
     {
       event: "grabbed",
-      title: "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
+      title: "Tidewater.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
     },
     db,
   );
 
   assert.equal(
     repo.wasGrabbedByVaka(
-      "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
+      "Tidewater.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
       db,
     ),
     true,
@@ -306,7 +306,7 @@ test("recognises a download Vaka grabbed itself, however it is punctuated", () =
   // Transmission names a single-file torrent after the file, extension and all.
   assert.equal(
     repo.wasGrabbedByVaka(
-      "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB.mkv",
+      "Tidewater.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB.mkv",
       db,
     ),
     true,
@@ -316,14 +316,14 @@ test("recognises a download Vaka grabbed itself, however it is punctuated", () =
   // Some trackers hand out spaces where the feed had dots.
   assert.equal(
     repo.wasGrabbedByVaka(
-      "Ted Lasso S04E02 Curiouser and Curiouser 1080p ATVP WEB-DL DDP5 1 Atmos H 264-playWEB",
+      "Tidewater S04E02 Curiouser and Curiouser 1080p ATVP WEB-DL DDP5 1 Atmos H 264-playWEB",
       db,
     ),
     true,
     "separators must not hide the match",
   );
 
-  assert.equal(repo.wasGrabbedByVaka("Moonwalker.1988.1080p.BluRay.x264-OFT", db), false);
+  assert.equal(repo.wasGrabbedByVaka("Nightrunner.1988.1080p.BluRay.x264-OFT", db), false);
   assert.equal(repo.wasGrabbedByVaka("", db), false);
 });
 
@@ -383,10 +383,10 @@ test("respects a library that names seasons differently", async () => {
     fileTemplate: "{title} - S{season:00}E{episode:00}",
   });
 
-  const source = path.join(downloads, "custom", "The.Bear.S10E01.720p.HDTV.x264-GRP.mkv");
+  const source = path.join(downloads, "custom", "Harbour.Lights.S10E01.720p.HDTV.x264-GRP.mkv");
   await makeFile(source);
   await importPath(source, getDb(), { releaseName: path.basename(source) });
 
-  const expected = path.join(tvLibrary, "The Bear", "Season 10", "The Bear - S10E01.mkv");
+  const expected = path.join(tvLibrary, "Harbour Lights", "Season 10", "Harbour Lights - S10E01.mkv");
   assert.ok((await fs.stat(expected)).isFile());
 });

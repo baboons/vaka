@@ -32,11 +32,11 @@ async function legacyDir(name: string, options: { leaveWal?: boolean } = {}) {
   const db = new Database(path.join(dir, "tvarr.db"));
   db.pragma("journal_mode = WAL");
   db.exec("CREATE TABLE relic (id INTEGER PRIMARY KEY, title TEXT)");
-  db.prepare("INSERT INTO relic (title) VALUES (?)").run("Ted Lasso");
+  db.prepare("INSERT INTO relic (title) VALUES (?)").run("Tidewater");
   if (options.leaveWal) {
     // Close without checkpointing, so the commit lives only in the -wal.
     db.pragma("wal_checkpoint(PASSIVE)");
-    db.prepare("INSERT INTO relic (title) VALUES (?)").run("The Bear");
+    db.prepare("INSERT INTO relic (title) VALUES (?)").run("Harbour Lights");
   }
   db.close();
 
@@ -60,7 +60,7 @@ test("a legacy database is adopted wherever the data directory points", async ()
   const rows = db.prepare("SELECT title FROM relic").all() as Array<{ title: string }>;
   assert.deepEqual(
     rows.map((row) => row.title),
-    ["Ted Lasso"],
+    ["Tidewater"],
     "the existing library came across rather than a blank database being made",
   );
 
@@ -78,20 +78,20 @@ test("commits still sitting in the write-ahead log survive the rename", async ()
   const rows = getDb().prepare("SELECT title FROM relic ORDER BY id").all() as Array<{
     title: string;
   }>;
-  assert.deepEqual(rows.map((row) => row.title), ["Ted Lasso", "The Bear"]);
+  assert.deepEqual(rows.map((row) => row.title), ["Tidewater", "Harbour Lights"]);
 });
 
 test("an existing Vaka database is never overwritten by an older one", async () => {
   const dir = await legacyDir("both");
   const current = new Database(path.join(dir, "vaka.db"));
   current.exec("CREATE TABLE relic (id INTEGER PRIMARY KEY, title TEXT)");
-  current.prepare("INSERT INTO relic (title) VALUES (?)").run("Severance");
+  current.prepare("INSERT INTO relic (title) VALUES (?)").run("Glasshouse");
   current.close();
 
   useDataDir(dir);
 
   const rows = getDb().prepare("SELECT title FROM relic").all() as Array<{ title: string }>;
-  assert.deepEqual(rows.map((row) => row.title), ["Severance"]);
+  assert.deepEqual(rows.map((row) => row.title), ["Glasshouse"]);
 
   // The old file is left alone rather than deleted — it is still the user's.
   assert.ok((await fs.readdir(dir)).includes("tvarr.db"));

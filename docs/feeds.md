@@ -12,8 +12,8 @@ and reports what it found, so you can confirm the URL before committing to it.
 ## Restricting a feed to one library
 
 Restrict a feed to **TV**, **movies** or **sport** to stop a film matching a
-show of the same name — worth doing if you follow both *Fargo* the series and
-*Fargo* the film.
+show of the same name — worth doing if you follow both *Ironwood* the series and
+*Ironwood* the film.
 
 ## Magnet-only feeds
 
