@@ -19,6 +19,8 @@ import type {
   MediaKind,
   MediaState,
   QualityProfile,
+  SportEventMeta,
+  SportSubscription,
 } from "./types";
 
 /* ------------------------------------------------------------------ */
@@ -48,6 +50,7 @@ function mapMedia(row: Row): Media {
     quality: parseQualityProfile(parseJson<unknown>(row.quality, {})),
     searchTerms: parseJson<string[]>(row.search_terms, []),
     folder: (row.folder as string) ?? null,
+    sport: parseJson<SportSubscription | null>(row.sport, null),
     state: row.state as MediaState,
     grabbedQuality: (row.grabbed_quality as string) ?? null,
     grabbedAt: (row.grabbed_at as string) ?? null,
@@ -71,6 +74,7 @@ function mapEpisode(row: Row): Episode {
     state: row.state as EpisodeState,
     grabbedQuality: (row.grabbed_quality as string) ?? null,
     grabbedAt: (row.grabbed_at as string) ?? null,
+    sport: parseJson<SportEventMeta | null>(row.sport, null),
   };
 }
 
@@ -158,6 +162,7 @@ export interface NewMedia {
   searchTerms?: string[];
   folder?: string | null;
   releaseDate?: string | null;
+  sport?: SportSubscription | null;
 }
 
 /** Strips a leading article so "The Bear" sorts under B. */
@@ -171,15 +176,16 @@ export function insertMedia(input: NewMedia, db: Db = getDb()): Media {
       `INSERT INTO media (
          kind, provider, provider_id, imdb_id, tvdb_id, title, sort_title, year,
          overview, poster, status, network, runtime, genres, monitored, quality,
-         search_terms, folder, state, release_date, added_at
+         search_terms, folder, sport, state, release_date, added_at
        ) VALUES (
          @kind, @provider, @providerId, @imdbId, @tvdbId, @title, @sortTitle, @year,
          @overview, @poster, @status, @network, @runtime, @genres, 1, @quality,
-         @searchTerms, @folder, 'wanted', @releaseDate, @addedAt
+         @searchTerms, @folder, @sport, 'wanted', @releaseDate, @addedAt
        )
        ON CONFLICT (provider, provider_id) DO UPDATE SET
          monitored = 1,
-         quality = excluded.quality`,
+         quality = excluded.quality,
+         sport = excluded.sport`,
     )
     .run({
       kind: input.kind,
@@ -199,6 +205,7 @@ export function insertMedia(input: NewMedia, db: Db = getDb()): Media {
       quality: JSON.stringify(input.quality),
       searchTerms: JSON.stringify(input.searchTerms ?? []),
       folder: input.folder ?? null,
+      sport: input.sport ? JSON.stringify(input.sport) : null,
       releaseDate: input.releaseDate ?? null,
       addedAt: nowIso(),
     });
@@ -269,6 +276,7 @@ export function updateMedia(
     genres: string[];
     releaseDate: string | null;
     refreshedAt: string | null;
+    sport: SportSubscription | null;
   }>,
   db: Db = getDb(),
 ): void {
@@ -290,6 +298,7 @@ export function updateMedia(
     genres: "genres",
     releaseDate: "release_date",
     refreshedAt: "refreshed_at",
+    sport: "sport",
   };
 
   const sets: string[] = [];
@@ -301,6 +310,7 @@ export function updateMedia(
     if (key === "monitored") params.push(fromBool(value as boolean));
     else if (key === "quality" || key === "searchTerms" || key === "genres")
       params.push(JSON.stringify(value));
+    else if (key === "sport") params.push(value ? JSON.stringify(value) : null);
     else params.push(value ?? null);
   }
   if (patch.title) {
@@ -361,6 +371,81 @@ export function upsertEpisodes(episodes: NewEpisode[], db: Db = getDb()): void {
     }
   });
   run(episodes);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sports events                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface NewSportEvent {
+  mediaId: number;
+  /** The provider's event id. Stable, and what the row is keyed by. */
+  providerId: string;
+  /** Season year, used as the season number so events group by year. */
+  season: number;
+  title: string;
+  airDate: string;
+  monitored: boolean;
+  sport: SportEventMeta;
+}
+
+/**
+ * Insert or refresh a competition's calendar.
+ *
+ * Unlike episodes, sports events are keyed by the provider's event id rather
+ * than by a number. A calendar grows in the middle — a postponed game is
+ * rescheduled, a fight is added to a card — and numbering by position would
+ * quietly reassign every row after the insertion point, taking the grab state
+ * with it. The number is therefore assigned once, on insert, and never moves.
+ */
+export function upsertSportEvents(
+  events: NewSportEvent[],
+  db: Db = getDb(),
+): { inserted: number; updated: number } {
+  const find = db.prepare(
+    "SELECT id FROM episodes WHERE media_id = ? AND provider_id = ?",
+  );
+  const nextNumber = db.prepare(
+    "SELECT COALESCE(MAX(number), 0) + 1 AS next FROM episodes WHERE media_id = ? AND season = ?",
+  );
+  const insert = db.prepare(
+    `INSERT INTO episodes (media_id, provider_id, season, number, title, air_date, monitored, state, sport)
+     VALUES (@mediaId, @providerId, @season, @number, @title, @airDate, @monitored, 'wanted', @sport)`,
+  );
+  // Season is left alone: moving a row between seasons could collide with the
+  // number already used there, and a season year does not change in practice.
+  const update = db.prepare(
+    "UPDATE episodes SET title = ?, air_date = ?, sport = ? WHERE id = ?",
+  );
+
+  const totals = { inserted: 0, updated: 0 };
+
+  const run = db.transaction((rows: NewSportEvent[]) => {
+    for (const row of rows) {
+      const existing = find.get(row.mediaId, row.providerId) as { id: number } | undefined;
+      if (existing) {
+        update.run(row.title, row.airDate, JSON.stringify(row.sport), existing.id);
+        totals.updated += 1;
+        continue;
+      }
+
+      const { next } = nextNumber.get(row.mediaId, row.season) as { next: number };
+      insert.run({
+        mediaId: row.mediaId,
+        providerId: row.providerId,
+        season: row.season,
+        number: next,
+        title: row.title,
+        airDate: row.airDate,
+        monitored: fromBool(row.monitored),
+        sport: JSON.stringify(row.sport),
+      });
+      totals.inserted += 1;
+    }
+  });
+
+  run(events);
+  return totals;
 }
 
 export function listEpisodes(mediaId: number, db: Db = getDb()): Episode[] {
@@ -476,6 +561,7 @@ export function listWantedEpisodes(db: Db = getDb()): Array<Episode & { media: M
 
 export interface UpcomingEpisode extends Episode {
   mediaTitle: string;
+  mediaKind: MediaKind;
   poster: string | null;
 }
 
@@ -485,7 +571,7 @@ export function listUpcoming(days = 14, db: Db = getDb()): UpcomingEpisode[] {
   const to = new Date(from.getTime() + days * 86400000);
   const rows = db
     .prepare(
-      `SELECT e.*, m.title AS media_title, m.poster AS poster
+      `SELECT e.*, m.title AS media_title, m.kind AS media_kind, m.poster AS poster
        FROM episodes e JOIN media m ON m.id = e.media_id
        WHERE m.monitored = 1 AND e.air_date IS NOT NULL
          AND e.air_date >= ? AND e.air_date <= ?
@@ -495,6 +581,7 @@ export function listUpcoming(days = 14, db: Db = getDb()): UpcomingEpisode[] {
   return rows.map((row) => ({
     ...mapEpisode(row),
     mediaTitle: row.media_title as string,
+    mediaKind: row.media_kind as MediaKind,
     poster: (row.poster as string) ?? null,
   }));
 }

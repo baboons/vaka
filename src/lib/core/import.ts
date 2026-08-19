@@ -19,6 +19,8 @@ import path from "node:path";
 import { expandHome, nowIso, type Db } from "./db";
 import { buildDestination, type Destination, type NamingTemplates } from "./naming";
 import { buildTitleIndex, findMedia } from "./match";
+import { bestSportMatch } from "./match-sport";
+import { parseSportRelease } from "./parse-sport";
 import { describeQuality, parseRelease } from "./parse-release";
 import * as repo from "./repo";
 import { getConfig } from "./settings";
@@ -147,9 +149,15 @@ async function findSubtitles(videoPath: string): Promise<string[]> {
   }
 }
 
+const LIBRARY_NOUNS: Record<MediaKind, string> = {
+  tv: "TV",
+  movie: "movie",
+  sport: "sports",
+};
+
 function templatesFor(kind: MediaKind, db: Db): { templates: NamingTemplates; libraryDir: string } {
   const config = getConfig(db);
-  const section = kind === "tv" ? config.tv : config.movies;
+  const section = kind === "tv" ? config.tv : kind === "sport" ? config.sports : config.movies;
   return {
     templates: {
       folder: section.folderTemplate,
@@ -181,7 +189,9 @@ export async function planImport(
     return { items: [], skipped: skipped.length ? skipped : [{ file: source, reason: "no video files found" }] };
   }
 
-  const index = buildTitleIndex(repo.listMedia({}, db));
+  const library = repo.listMedia({}, db);
+  const index = buildTitleIndex(library.filter((media) => media.kind !== "sport"));
+  const competitions = library.filter((media) => media.kind === "sport");
   const items: ImportPlanItem[] = [];
 
   for (const file of files) {
@@ -192,7 +202,15 @@ export async function planImport(
     const parsed =
       fromFile.season !== null || fromFile.episodes.length || !fromRelease ? fromFile : fromRelease;
 
-    const media = findMedia(index, parsed) ?? (fromRelease ? findMedia(index, fromRelease) : null);
+    // Sport is resolved first: a file called "UFC.330.Main.Card.mkv" has no
+    // season or episode for the ordinary matcher to work with.
+    const sport = resolveSportFile(
+      competitions,
+      [options.releaseName, path.basename(file.path)],
+      db,
+    );
+
+    const media = sport?.media ?? findMedia(index, parsed) ?? (fromRelease ? findMedia(index, fromRelease) : null);
     if (!media) {
       skipped.push({ file: file.path, reason: "no followed title matches this file" });
       continue;
@@ -202,15 +220,24 @@ export async function planImport(
     if (!libraryDir.trim()) {
       skipped.push({
         file: file.path,
-        reason: `no ${media.kind === "tv" ? "TV" : "movie"} library folder is configured`,
+        reason: `no ${LIBRARY_NOUNS[media.kind]} library folder is configured`,
       });
       continue;
     }
 
-    const episodes = media.kind === "tv" ? resolveEpisodes(media, parsed, fromRelease, db) : [];
-    if (media.kind === "tv" && !episodes.length) {
-      skipped.push({ file: file.path, reason: "could not tell which episode this is" });
-      continue;
+    let episodes: Episode[] = [];
+    if (media.kind === "sport") {
+      episodes = sport ? [sport.episode] : [];
+      if (!episodes.length) {
+        skipped.push({ file: file.path, reason: "could not tell which event this is" });
+        continue;
+      }
+    } else if (media.kind === "tv") {
+      episodes = resolveEpisodes(media, parsed, fromRelease, db);
+      if (!episodes.length) {
+        skipped.push({ file: file.path, reason: "could not tell which episode this is" });
+        continue;
+      }
     }
 
     const first = episodes[0];
@@ -226,6 +253,7 @@ export async function planImport(
         episode: first?.number ?? null,
         episodeEnd: episodes.length > 1 ? episodes[episodes.length - 1].number : null,
         episodeTitle: first?.title ?? null,
+        airDate: first?.airDate ?? null,
         quality: describeQuality(parsed),
         group: parsed.group,
       },
@@ -253,14 +281,46 @@ export async function planImport(
       mediaTitle: media.title,
       episodeIds: episodes.map((episode) => episode.id),
       label:
-        media.kind === "tv" && first
-          ? `S${String(first.season).padStart(2, "0")}E${String(first.number).padStart(2, "0")}`
-          : "Movie",
+        media.kind === "sport"
+          ? (first?.title ?? "Event")
+          : media.kind === "tv" && first
+            ? `S${String(first.season).padStart(2, "0")}E${String(first.number).padStart(2, "0")}`
+            : "Movie",
       extras,
     });
   }
 
   return { items, skipped };
+}
+
+/**
+ * Which followed competition and which event a downloaded file belongs to.
+ *
+ * The same scoring that decided to grab it decides where it goes, so a file
+ * cannot be filed under an event tvarr was never confident enough to want.
+ * Both the torrent name and the file name are tried, since either one may be
+ * the one carrying the date.
+ */
+function resolveSportFile(
+  competitions: Media[],
+  names: Array<string | undefined>,
+  db: Db,
+): { media: Media; episode: Episode } | null {
+  if (!competitions.length) return null;
+
+  for (const name of names) {
+    if (!name) continue;
+    const parsed = parseSportRelease(name);
+    if (!parsed.league) continue;
+
+    for (const media of competitions) {
+      if (media.sport?.league !== parsed.league.id) continue;
+      const match = bestSportMatch(parsed, repo.listEpisodes(media.id, db));
+      if (match) return { media, episode: match.episode };
+    }
+  }
+
+  return null;
 }
 
 function resolveEpisodes(

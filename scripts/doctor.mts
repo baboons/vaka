@@ -84,6 +84,7 @@ console.log(
 );
 console.log(`  TV library      ${await folderState(config.tv.libraryDir)}`);
 console.log(`  Movie library   ${await folderState(config.movies.libraryDir)}`);
+console.log(`  Sports library  ${await folderState(config.sports.libraryDir)}`);
 console.log(
   `  Watch folder    ${config.importing.watchDir.trim() ? await folderState(config.importing.watchDir) : `${DIM}none${RESET}`}`,
 );

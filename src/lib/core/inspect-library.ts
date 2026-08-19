@@ -30,6 +30,13 @@ const SEASON_PATTERNS: Array<{ regex: RegExp; template: (width: number) => strin
   { regex: /^series\s+(\d+)$/i, template: (w) => `Series ${seasonToken(w)}` },
 ];
 
+/** Sports libraries group by year, so a bare "2026" is the folder to look for. */
+const SPORT_SEASON_PATTERNS: Array<{ regex: RegExp; template: (width: number) => string }> = [
+  { regex: /^((?:19|20)\d{2})$/, template: () => "{season}" },
+  { regex: /^season\s+((?:19|20)\d{2})$/i, template: () => "Season {season}" },
+  { regex: /^(\d{4})[-/](?:\d{2,4})$/, template: () => "{season}" },
+];
+
 const YEAR_IN_FOLDER = /\((19|20)\d{2}\)\s*$/;
 
 export interface LibraryReport {
@@ -44,7 +51,7 @@ export interface LibraryReport {
   samples: string[];
   /** How many title folders carry "(YYYY)". */
   withYear: number;
-  /** TV only: season folder styles that were found. */
+  /** TV and sports: season (or year) folder styles that were found. */
   seasonStyles: Array<{ example: string; count: number }>;
   /** Movies only: files sitting loose in the root rather than in a folder. */
   looseFiles: number;
@@ -107,7 +114,9 @@ export async function inspectLibrary(
   base.samples = titleDirs.slice(0, 5).map((entry) => entry.name);
   base.withYear = titleDirs.filter((entry) => YEAR_IN_FOLDER.test(entry.name)).length;
 
-  if (kind === "tv") {
+  // Movies live one folder deep; shows and competitions both group below that.
+  if (kind !== "movie") {
+    const patterns = kind === "sport" ? SPORT_SEASON_PATTERNS : SEASON_PATTERNS;
     const styles = new Map<string, { example: string; count: number; width: number; template: string }>();
 
     for (const titleDir of titleDirs) {
@@ -120,7 +129,7 @@ export async function inspectLibrary(
 
       for (const child of children) {
         if (!child.isDirectory()) continue;
-        for (const { regex, template } of SEASON_PATTERNS) {
+        for (const { regex, template } of patterns) {
           const match = regex.exec(child.name);
           if (!match) continue;
           // "Season 1" and "Season 01" are different conventions.
@@ -147,9 +156,10 @@ export async function inspectLibrary(
   }
 
   // A library that never writes the year in folder names should keep not
-  // writing it — Plex matches either way.
+  // writing it — Plex matches either way. Competitions never carry one, so
+  // there is nothing here to reconsider.
   const yearIsUsual = base.titleCount > 0 && base.withYear >= Math.ceil(base.titleCount / 2);
-  if (!yearIsUsual && base.titleCount >= 3) {
+  if (kind !== "sport" && !yearIsUsual && base.titleCount >= 3) {
     base.proposed.folder = "{title}";
     base.proposed.file =
       kind === "tv" ? "{title} - S{season:00}E{episode:00} - {episodeTitle}" : "{title}";
@@ -171,7 +181,7 @@ function describe(report: LibraryReport): string {
     }.`,
   );
 
-  if (report.titleCount) {
+  if (report.titleCount && report.kind !== "sport") {
     parts.push(
       report.withYear >= Math.ceil(report.titleCount / 2)
         ? "Most folders include the year, so new ones will too."
@@ -193,6 +203,15 @@ function describe(report: LibraryReport): string {
       }
     } else {
       parts.push("No season folders were found, so the standard “Season 01” will be used.");
+    }
+  }
+
+  if (report.kind === "sport") {
+    if (report.seasonStyles.length) {
+      const [top] = report.seasonStyles;
+      parts.push(`Events are grouped in folders like “${top.example}”, which tvarr will match.`);
+    } else {
+      parts.push("No year folders were found, so events will be grouped under one per year.");
     }
   }
 

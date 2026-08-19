@@ -506,6 +506,9 @@ export async function search(
   query: string,
   tmdbApiKey?: string,
 ): Promise<SearchResult[]> {
+  // Competitions come from the sports catalogue, not from a metadata provider.
+  if (kind === "sport") throw new ProviderError("sports are not searched here");
+
   const trimmed = query.trim();
   if (!trimmed) return [];
   return kind === "tv" ? searchTv(trimmed) : searchMovies(trimmed, tmdbApiKey);
@@ -518,6 +521,10 @@ export async function refreshMetadata(
   providerId: string,
   tmdbApiKey?: string,
 ): Promise<SearchResult> {
+  // A competition has no metadata record — its calendar is refreshed instead,
+  // by syncSportEvents.
+  if (kind === "sport") throw new ProviderError("sports have no metadata record");
+
   return kind === "tv"
     ? getTvShow(providerId)
     : getMovie(provider, providerId, tmdbApiKey);

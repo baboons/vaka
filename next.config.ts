@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "image.tmdb.org" },
       { protocol: "https", hostname: "m.media-amazon.com" },
       { protocol: "https", hostname: "images.metahub.space" },
+      // Competition badges for the sports library.
+      { protocol: "https", hostname: "a.espncdn.com" },
     ],
   },
 };

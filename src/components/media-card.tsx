@@ -40,7 +40,7 @@ export function MediaCard({ media, counts, index = 0 }: MediaCardData & { index?
           </span>
         )}
 
-        {media.kind === "tv" && counts && counts.total > 0 && (
+        {media.kind !== "movie" && counts && counts.total > 0 && (
           <div
             className="absolute inset-x-0 bottom-0 h-[3px] bg-black/50"
             aria-hidden
@@ -62,7 +62,9 @@ export function MediaCard({ media, counts, index = 0 }: MediaCardData & { index?
         </p>
 
         <div className="flex items-center gap-1.5">
-          <span className="mono text-[11px] text-muted-foreground">{media.year ?? "—"}</span>
+          <span className="mono text-[11px] text-muted-foreground">
+            {media.kind === "sport" ? (media.network ?? "Competition") : (media.year ?? "—")}
+          </span>
           <span className="text-muted-foreground/40">·</span>
           <CardStatus media={media} counts={counts} />
         </div>
@@ -87,7 +89,11 @@ function CardStatus({ media, counts }: MediaCardData) {
   }
 
   if (!counts || counts.total === 0) {
-    return <span className="mono text-[11px] text-muted-foreground">no episodes</span>;
+    return (
+      <span className="mono text-[11px] text-muted-foreground">
+        {media.kind === "sport" ? "no events" : "no episodes"}
+      </span>
+    );
   }
 
   return (

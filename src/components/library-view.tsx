@@ -1,21 +1,52 @@
 import Link from "next/link";
-import { Clapperboard, Plus, Tv } from "lucide-react";
+import { Clapperboard, Plus, Trophy, Tv } from "lucide-react";
 
 import { EmptyState, PageHeader } from "@/components/bits";
 import { MediaCard, MediaGrid } from "@/components/media-card";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/lib/core/db";
 import * as repo from "@/lib/core/repo";
-import type { MediaKind } from "@/lib/core/types";
+import { KIND_LABELS, type MediaKind } from "@/lib/core/types";
 
-/** Shared body for the TV and Movies pages. */
+const ICONS = {
+  tv: <Tv className="size-7" />,
+  movie: <Clapperboard className="size-7" />,
+  sport: <Trophy className="size-7" />,
+} as const;
+
+const ADD_LABEL: Record<MediaKind, string> = {
+  tv: "Add show",
+  movie: "Add movie",
+  sport: "Follow a competition",
+};
+
+const EMPTY: Record<MediaKind, { title: string; description: string }> = {
+  tv: {
+    title: "No shows yet",
+    description:
+      "Follow a show and the watcher will start looking for its episodes in your RSS feeds.",
+  },
+  movie: {
+    title: "No movies yet",
+    description: "Add a film and the watcher will grab it when a matching release appears.",
+  },
+  sport: {
+    title: "No competitions yet",
+    description:
+      "Follow a league or promotion and tvarr will pull in its calendar, then watch your " +
+      "feeds for each event as it happens.",
+  },
+};
+
+/** Shared body for the TV, Movies and Sports pages. */
 export function LibraryView({ kind }: { kind: MediaKind }) {
   const db = getDb();
   const library = repo.listMedia({ kind }, db);
 
+  // Movies are wanted as a whole; shows and competitions have a list of parts.
   const entries = library.map((media) => ({
     media,
-    counts: media.kind === "tv" ? repo.countEpisodes(media.id, db) : undefined,
+    counts: media.kind === "movie" ? undefined : repo.countEpisodes(media.id, db),
   }));
 
   const watching = entries.filter((entry) => entry.media.monitored);
@@ -24,11 +55,11 @@ export function LibraryView({ kind }: { kind: MediaKind }) {
   const wanted = entries.reduce(
     (total, entry) =>
       total +
-      (entry.media.kind === "tv"
-        ? (entry.counts?.wanted ?? 0)
-        : entry.media.monitored && entry.media.state === "wanted"
+      (entry.media.kind === "movie"
+        ? entry.media.monitored && entry.media.state === "wanted"
           ? 1
-          : 0),
+          : 0
+        : (entry.counts?.wanted ?? 0)),
     0,
   );
 
@@ -36,7 +67,7 @@ export function LibraryView({ kind }: { kind: MediaKind }) {
     <>
       <PageHeader
         eyebrow="Library"
-        title={kind === "tv" ? "TV shows" : "Movies"}
+        title={KIND_LABELS[kind]}
         description={
           library.length === 0
             ? undefined
@@ -48,7 +79,7 @@ export function LibraryView({ kind }: { kind: MediaKind }) {
           <Button asChild size="sm">
             <Link href={`/add?kind=${kind}`}>
               <Plus className="size-3.5" />
-              Add {kind === "tv" ? "show" : "movie"}
+              {ADD_LABEL[kind]}
             </Link>
           </Button>
         }
@@ -57,18 +88,14 @@ export function LibraryView({ kind }: { kind: MediaKind }) {
       <div className="space-y-10 px-5 py-6 md:px-8 md:py-8">
         {entries.length === 0 ? (
           <EmptyState
-            icon={kind === "tv" ? <Tv className="size-7" /> : <Clapperboard className="size-7" />}
-            title={kind === "tv" ? "No shows yet" : "No movies yet"}
-            description={
-              kind === "tv"
-                ? "Follow a show and the watcher will start looking for its episodes in your RSS feeds."
-                : "Add a film and the watcher will grab it when a matching release appears."
-            }
+            icon={ICONS[kind]}
+            title={EMPTY[kind].title}
+            description={EMPTY[kind].description}
             action={
               <Button asChild size="sm" className="mt-1">
                 <Link href={`/add?kind=${kind}`}>
                   <Plus className="size-3.5" />
-                  Search
+                  {kind === "sport" ? "Browse competitions" : "Search"}
                 </Link>
               </Button>
             }

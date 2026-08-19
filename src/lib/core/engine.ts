@@ -16,17 +16,27 @@ import {
   findMedia,
   isUpgrade,
 } from "./match";
+import {
+  bestSportMatch,
+  eventIsFollowed,
+  sessionAllowed,
+  type SportMatch,
+} from "./match-sport";
+import { parseSportRelease, type ParsedSportRelease } from "./parse-sport";
 import { describeQuality, parseRelease } from "./parse-release";
 import * as providers from "./providers";
 import * as repo from "./repo";
-import { getConfig, getKindConfig } from "./settings";
-import type {
-  Episode,
-  FeedItem,
-  Media,
-  MediaKind,
-  ParsedRelease,
-  QualityProfile,
+import { getConfig, getKindConfig, getSportsConfig } from "./settings";
+import * as sports from "./sports";
+import {
+  SESSION_LABELS,
+  type Episode,
+  type FeedItem,
+  type Media,
+  type MediaKind,
+  type ParsedRelease,
+  type QualityProfile,
+  type SportSession,
 } from "./types";
 
 export interface PollSummary {
@@ -98,6 +108,35 @@ interface Target {
 }
 
 /**
+ * Everything needed to ask "what is this release?".
+ *
+ * Two indexes, because the two questions are not the same one. A show or a
+ * film is looked up by an exact normalized title; a sporting event is looked
+ * up by competition and then *scored* against that competition's calendar,
+ * since the release name carries no key that identifies one event.
+ */
+export interface LibraryIndex {
+  titles: Map<string, Media[]>;
+  sports: Map<string, Media[]>;
+}
+
+export function buildLibraryIndex(library: Media[]): LibraryIndex {
+  const sportsIndex = new Map<string, Media[]>();
+
+  for (const media of library) {
+    if (media.kind !== "sport" || !media.sport?.league) continue;
+    const bucket = sportsIndex.get(media.sport.league);
+    if (bucket) bucket.push(media);
+    else sportsIndex.set(media.sport.league, [media]);
+  }
+
+  return {
+    titles: buildTitleIndex(library.filter((media) => media.kind !== "sport")),
+    sports: sportsIndex,
+  };
+}
+
+/**
  * Work out which episodes (if any) a release would satisfy, and whether the
  * library still wants them.
  */
@@ -163,6 +202,23 @@ function wantedEpisodes(
   return { ok: false, reason: isUpgrade(profile, monitored[0].grabbedQuality, parsed).reason };
 }
 
+/**
+ * The event a sports release was matched to, re-read so its state is current.
+ *
+ * The event is already chosen by then — screening scored it — so this only
+ * asks whether it is still wanted.
+ */
+function resolveSportTarget(
+  media: Media,
+  match: SportMatch,
+  parsed: ParsedRelease,
+  db: Db,
+): { ok: true; target: Target } | { ok: false; reason: string } {
+  const episode = repo.getEpisode(match.episode.id, db);
+  if (!episode) return { ok: false, reason: "the event is no longer in the calendar" };
+  return wantedEpisodes(media, [episode], parsed, media.quality);
+}
+
 /** A release that passed the quality filter and is waiting to be ranked. */
 interface Candidate {
   item: FeedItem;
@@ -170,6 +226,8 @@ interface Candidate {
   media: Media;
   quality: string;
   score: number;
+  /** Sports: the event this release was matched to, and how sure we were. */
+  sport?: { match: SportMatch; session: string };
 }
 
 function logRejection(
@@ -199,16 +257,34 @@ function logRejection(
  * Returns null when it matches nothing in the library — the common case, and
  * deliberately not logged, since a feed is mostly other people's shows.
  */
+type Screened = { rejected: true } | { rejected: false; candidate: Candidate } | null;
+
 function screenItem(
   item: FeedItem,
-  index: Map<string, Media[]>,
+  index: LibraryIndex,
   feedKind: MediaKind | "any",
   db: Db,
-): { rejected: true } | { rejected: false; candidate: Candidate } | null {
+): Screened {
   if (repo.hasGrabbed(item.guid, db)) return null;
 
+  // Sport is tried first, but only when the release names a competition that
+  // is actually followed — otherwise this falls straight through and a show
+  // called "NFL Films Presents" is still matched as a show.
+  const sportRelease = parseSportRelease(item.title);
+  if (sportRelease.league && index.sports.has(sportRelease.league.id)) {
+    if (feedKind === "any" || feedKind === "sport") {
+      const screened = screenSportItem(
+        item,
+        sportRelease,
+        index.sports.get(sportRelease.league.id)!,
+        db,
+      );
+      if (screened) return screened;
+    }
+  }
+
   const parsed = parseRelease(item.title);
-  const media = findMedia(index, parsed);
+  const media = findMedia(index.titles, parsed);
   if (!media) return null;
   if (feedKind !== "any" && media.kind !== feedKind) return null;
   if (!media.monitored) return null;
@@ -222,6 +298,89 @@ function screenItem(
   }
 
   return { rejected: false, candidate: { item, parsed, media, quality, score: decision.score } };
+}
+
+/**
+ * Screen a release against a followed competition.
+ *
+ * The two-threshold rule lives here. A release that scores well enough to
+ * identify an event but not well enough to be sure is *not* grabbed — it is
+ * recorded so it shows up under the competition's releases with a Grab button
+ * next to it. Downloading the wrong game is worse than downloading nothing,
+ * and unlike `S03E01` a sports name genuinely does leave room for doubt.
+ */
+function screenSportItem(
+  item: FeedItem,
+  sportRelease: ParsedSportRelease,
+  candidates: Media[],
+  db: Db,
+): Screened {
+  const parsed = parseRelease(item.title);
+  const quality = describeQuality(parsed);
+
+  for (const media of candidates) {
+    if (!media.monitored || !media.sport) continue;
+
+    const events = repo.listEpisodes(media.id, db);
+    const match = bestSportMatch(sportRelease, events);
+    if (!match) continue;
+
+    const sessionLabel = SESSION_LABELS[sportRelease.session];
+
+    if (!sessionAllowed(media.sport, sportRelease.session)) {
+      logRejection(item, media, quality, `${sessionLabel.toLowerCase()} is not wanted`, db);
+      return { rejected: true };
+    }
+
+    // Season packs mean nothing here; a whole-season sports torrent is just a
+    // large event, and the check would only ever reject by accident.
+    const decision = evaluateQuality(
+      { ...media.quality, allowSeasonPacks: true },
+      parsed,
+      item,
+    );
+    if (!decision.ok) {
+      logRejection(item, media, quality, decision.reason, db);
+      return { rejected: true };
+    }
+
+    const eventName = match.episode.title ?? `event ${match.episode.number}`;
+
+    if (!match.confident && !media.sport.autoGrabUncertain) {
+      repo.addHistory(
+        {
+          mediaId: media.id,
+          episodeId: match.episode.id,
+          feedId: item.feedId,
+          event: "info",
+          title: item.title,
+          quality,
+          reason:
+            `probably ${eventName} (${match.score}/100, ${match.reasons.join(", ")}) — ` +
+            `waiting for you to confirm it under Releases`,
+          guid: item.guid,
+        },
+        db,
+      );
+      return { rejected: true };
+    }
+
+    return {
+      rejected: false,
+      candidate: {
+        item,
+        parsed,
+        media,
+        quality,
+        // Confidence leads the ranking so the best-identified release of an
+        // event wins, with the usual quality score breaking ties.
+        score: match.score * 1000 + decision.score,
+        sport: { match, session: sessionLabel },
+      },
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -244,7 +403,9 @@ async function processCandidates(
 
     // State may have changed while working through higher-scoring releases.
     const current = repo.getMedia(media.id, db) ?? media;
-    const resolved = resolveTarget(current, parsed, current.quality, db);
+    const resolved = candidate.sport
+      ? resolveSportTarget(current, candidate.sport.match, parsed, db)
+      : resolveTarget(current, parsed, current.quality, db);
 
     if (!resolved.ok) {
       logRejection(item, current, quality, resolved.reason, db);
@@ -267,7 +428,7 @@ async function grabTarget(
   db: Db,
 ): Promise<"grabbed" | "error"> {
   const config = getConfig(db);
-  const kindConfig = target.media.kind === "tv" ? config.tv : config.movies;
+  const kindConfig = getKindConfig(target.media.kind, db);
 
   try {
     const result = await grabRelease(item, target.media, kindConfig, {
@@ -299,10 +460,7 @@ async function grabTarget(
         event: "grabbed",
         title: item.title,
         quality,
-        reason:
-          target.media.kind === "tv"
-            ? `${describeEpisodes(target.episodes)} (${target.reason})`
-            : target.reason,
+        reason: describeTarget(target),
         path: result.path,
         guid: item.guid,
       },
@@ -326,6 +484,16 @@ async function grabTarget(
     );
     return "error";
   }
+}
+
+/** What went into the download folder, and why, for the activity log. */
+function describeTarget(target: Target): string {
+  if (target.media.kind === "movie") return target.reason;
+  if (target.media.kind === "sport") {
+    const event = target.episodes[0];
+    return event?.title ? `${event.title} (${target.reason})` : target.reason;
+  }
+  return `${describeEpisodes(target.episodes)} (${target.reason})`;
 }
 
 function describeEpisodes(episodes: Episode[]): string {
@@ -358,7 +526,7 @@ export async function evaluatePendingItems(db: Db = getDb()): Promise<Evaluation
   };
   if (!items.length) return summary;
 
-  const index = buildTitleIndex(repo.listMedia({ monitoredOnly: true }, db));
+  const index = buildLibraryIndex(repo.listMedia({ monitoredOnly: true }, db));
   const kinds = repo.feedKinds(db);
   const processed: number[] = [];
   const candidates: Candidate[] = [];
@@ -414,7 +582,7 @@ export async function searchForMedia(
   };
   if (!media) return summary;
 
-  const index = buildTitleIndex([media]);
+  const index = buildLibraryIndex([media]);
   const items = repo.listFeedItemsForKind(media.kind, db);
   summary.considered = items.length;
 
@@ -447,6 +615,12 @@ export interface CachedRelease {
   /** Whether the quality profile accepts it, and why not when it does not. */
   decision: { ok: boolean; reason: string; score: number };
   publishedAt: string | null;
+  /**
+   * Sports only: how sure we are this is the event named, and what made us
+   * think so. Present because for sport that judgement is the interesting
+   * part, and a release below the auto-grab line is shown here on purpose.
+   */
+  confidence?: { score: number; confident: boolean; reasons: string[] };
 }
 
 /**
@@ -457,6 +631,8 @@ export interface CachedRelease {
 export function listCachedReleases(mediaId: number, db: Db = getDb()): CachedRelease[] {
   const media = repo.getMedia(mediaId, db);
   if (!media) return [];
+
+  if (media.kind === "sport") return listCachedSportReleases(media, db);
 
   const index = buildTitleIndex([media]);
   const kinds = repo.feedKinds(db);
@@ -492,6 +668,77 @@ export function listCachedReleases(mediaId: number, db: Db = getDb()): CachedRel
   });
 }
 
+/**
+ * Cached releases for a competition, with the confidence behind each match.
+ *
+ * This screen is doing more work for sport than it does elsewhere: for a show
+ * it explains why something was turned down, and for a competition it is also
+ * where the probable-but-unconfirmed matches wait to be grabbed by hand.
+ */
+function listCachedSportReleases(media: Media, db: Db): CachedRelease[] {
+  const subscription = media.sport;
+  if (!subscription) return [];
+
+  const events = repo.listEpisodes(media.id, db);
+  const kinds = repo.feedKinds(db);
+  const releases: CachedRelease[] = [];
+
+  for (const item of repo.listFeedItemsForKind("sport", db)) {
+    const feedKind = kinds.get(item.feedId) ?? "any";
+    if (feedKind !== "any" && feedKind !== "sport") continue;
+
+    const sportRelease = parseSportRelease(item.title);
+    if (sportRelease.league?.id !== subscription.league) continue;
+
+    const match = bestSportMatch(sportRelease, events);
+    if (!match) continue;
+
+    const parsed = parseRelease(item.title);
+    const quality = evaluateQuality(
+      { ...media.quality, allowSeasonPacks: true },
+      parsed,
+      item,
+    );
+
+    const wantsSession = sessionAllowed(subscription, sportRelease.session);
+    const sessionLabel = SESSION_LABELS[sportRelease.session];
+
+    const decision = !wantsSession
+      ? { ok: false, reason: `${sessionLabel.toLowerCase()} is not wanted`, score: 0 }
+      : !quality.ok
+        ? quality
+        : match.confident || subscription.autoGrabUncertain
+          ? quality
+          : {
+              ok: false,
+              reason: `not sure enough to grab on its own (${match.reasons.join(", ")})`,
+              score: quality.score,
+            };
+
+    releases.push({
+      item,
+      quality: describeQuality(parsed),
+      label: match.episode.title ?? sessionLabel,
+      seeders: item.seeders,
+      sizeBytes: item.sizeBytes,
+      decision,
+      publishedAt: item.publishedAt,
+      confidence: {
+        score: match.score,
+        confident: match.confident,
+        reasons: match.reasons,
+      },
+    });
+  }
+
+  return releases.sort((a, b) => {
+    if (a.decision.ok !== b.decision.ok) return a.decision.ok ? -1 : 1;
+    const byConfidence = (b.confidence?.score ?? 0) - (a.confidence?.score ?? 0);
+    if (byConfidence !== 0) return byConfidence;
+    return b.decision.score - a.decision.score;
+  });
+}
+
 function describeEpisodeNumbers(season: number, episodes: number[]): string {
   if (episodes.length === 1) return `S${pad(season)}E${pad(episodes[0])}`;
   return `S${pad(season)}E${pad(Math.min(...episodes))}-E${pad(Math.max(...episodes))}`;
@@ -512,7 +759,13 @@ export async function grabItemManually(
   const quality = describeQuality(parsed);
 
   let episodes: Episode[] = [];
-  if (media.kind === "tv" && parsed.season !== null) {
+  if (media.kind === "sport") {
+    const match = bestSportMatch(parseSportRelease(item.title), repo.listEpisodes(media.id, db));
+    if (!match) {
+      return { ok: false, message: "this release does not look like any event on the calendar" };
+    }
+    episodes = [match.episode];
+  } else if (media.kind === "tv" && parsed.season !== null) {
     const seasonEpisodes = repo.listSeasonEpisodes(media.id, parsed.season, db);
     episodes = episodesForRelease(parsed, seasonEpisodes);
   } else if (media.kind === "tv" && parsed.airDate) {
@@ -543,6 +796,109 @@ export interface AddMediaInput {
   monitorMode?: MonitorMode;
   folder?: string | null;
   searchTerms?: string[];
+}
+
+export interface AddSportInput {
+  /** Catalogue id, e.g. "ufc" or "eng.1". */
+  leagueId: string;
+  /** Competitors to follow. Empty means every event in the competition. */
+  teams: string[];
+  sessions: SportSession[];
+  autoGrabUncertain: boolean;
+  quality: QualityProfile;
+  folder?: string | null;
+}
+
+/**
+ * Follow a competition, and pull in its calendar.
+ *
+ * Unlike a show, a competition has no metadata record to fetch — it is an
+ * entry in the catalogue plus a choice about which of it to follow. The
+ * calendar is the interesting part, and it is fetched here so the library
+ * screen has something to show immediately.
+ */
+export async function addSport(input: AddSportInput, db: Db = getDb()): Promise<Media> {
+  const league = sports.findLeague(input.leagueId);
+  if (!league) throw new Error(`unknown competition: ${input.leagueId}`);
+
+  const media = repo.insertMedia(
+    {
+      kind: "sport",
+      provider: "espn",
+      providerId: league.id,
+      title: league.name,
+      overview: null,
+      poster: league.logo,
+      status: null,
+      network: league.fullName,
+      genres: [league.group],
+      quality: input.quality,
+      folder: input.folder ?? null,
+      sport: {
+        league: league.id,
+        teams: input.teams,
+        sessions: input.sessions,
+        autoGrabUncertain: input.autoGrabUncertain,
+      },
+    },
+    db,
+  );
+
+  await syncSportEvents(media, db);
+  repo.updateMedia(media.id, { refreshedAt: nowIso() }, db);
+  repo.enqueueJob("search_media", { mediaId: media.id }, db);
+
+  return repo.getMedia(media.id, db)!;
+}
+
+export interface SportSyncSummary {
+  inserted: number;
+  updated: number;
+  /** Events dropped because they involve nobody being followed. */
+  filtered: number;
+}
+
+/**
+ * Pull a competition's calendar into the library.
+ *
+ * The team filter is applied here rather than at match time on purpose: a
+ * followed NHL team plays 82 games, and the league schedules 1,300. Writing
+ * only the followed ones keeps the calendar the size of what someone actually
+ * asked for, and keeps matching fast.
+ */
+export async function syncSportEvents(
+  media: Media,
+  db: Db = getDb(),
+): Promise<SportSyncSummary> {
+  const subscription = media.sport;
+  if (!subscription) return { inserted: 0, updated: 0, filtered: 0 };
+
+  const config = getSportsConfig(db);
+  const now = Date.now();
+  const from = new Date(now - config.lookbehindDays * 86_400_000);
+  const to = new Date(now + config.lookaheadDays * 86_400_000);
+
+  const events = await sports.fetchEvents(subscription.league, from, to);
+
+  const wanted = events.filter((event) => eventIsFollowed(subscription, event.competitors));
+  const rows = wanted.map((event) => ({
+    mediaId: media.id,
+    providerId: event.id,
+    season: event.seasonYear,
+    title: event.name,
+    airDate: event.date,
+    // Everything in the window is wanted: a release always lands after the
+    // broadcast, so a past event is the normal case rather than a backlog.
+    monitored: true,
+    sport: {
+      eventNumber: event.eventNumber,
+      competitors: event.competitors,
+      identityGroups: event.identityGroups,
+    },
+  }));
+
+  const totals = repo.upsertSportEvents(rows, db);
+  return { ...totals, filtered: events.length - wanted.length };
 }
 
 /** Add a show or movie to the library and pull in its episode list. */
@@ -636,6 +992,14 @@ export async function syncEpisodes(
 export async function refreshMedia(mediaId: number, db: Db = getDb()): Promise<void> {
   const media = repo.getMedia(mediaId, db);
   if (!media) return;
+
+  // A competition has no metadata record to refresh — its calendar is the
+  // thing that changes.
+  if (media.kind === "sport") {
+    await syncSportEvents(media, db);
+    repo.updateMedia(media.id, { refreshedAt: nowIso() }, db);
+    return;
+  }
 
   const config = getConfig(db);
   const fresh = await providers.refreshMetadata(

@@ -1,9 +1,9 @@
 /**
  * Application configuration.
  *
- * TV and movies are configured independently — each has its own download
- * folder and its own quality profile — because wanting 4K films but 1080p
- * episodes (or vice versa) is the normal case, not the exception.
+ * TV, movies and sports are configured independently — each has its own
+ * download folder and its own quality profile — because wanting 4K films but
+ * 1080p episodes (or vice versa) is the normal case, not the exception.
  *
  * Stored as a handful of JSON blobs in the `settings` table and validated on
  * read, so a config written by an older version still loads.
@@ -18,6 +18,7 @@ import { getDb, type Db } from "./db";
 import { defaultTemplates } from "./naming";
 import {
   DEFAULT_MOVIE_PROFILE,
+  DEFAULT_SPORT_PROFILE,
   DEFAULT_TV_PROFILE,
   RESOLUTIONS,
   SOURCES,
@@ -39,7 +40,7 @@ const qualitySchema = z.object({
   allowSeasonPacks: z.boolean().default(false),
 });
 
-/** Per-library settings. One of these for TV, one for movies. */
+/** Per-library settings. One of these for each of TV, movies and sports. */
 const kindConfigSchema = z.object({
   /**
    * Blackhole directory watched by the torrent client.
@@ -59,9 +60,25 @@ const kindConfigSchema = z.object({
   /** Plex library root, e.g. /media/TV. Empty disables importing for this kind. */
   libraryDir: z.string().default(""),
   folderTemplate: z.string().default("{title} ({year})"),
-  /** TV only. */
+  /** Grouping folder inside the title. Unused for movies. */
   seasonTemplate: z.string().default("Season {season:00}"),
   fileTemplate: z.string().default("{title} ({year})"),
+});
+
+/**
+ * Sports add a calendar to the usual per-library settings.
+ *
+ * The window is bounded in both directions on purpose: a whole NHL season is
+ * 1,300 fixtures, and nobody needs last October's games sitting in the
+ * database waiting for a release that will never come.
+ */
+const sportsConfigSchema = kindConfigSchema.extend({
+  /** How far ahead to pull fixtures. */
+  lookaheadDays: z.number().int().min(1).max(365).default(60),
+  /** How far back to keep looking for a release of something already played. */
+  lookbehindDays: z.number().int().min(0).max(365).default(21),
+  /** Hours between calendar refreshes. */
+  syncIntervalHours: z.number().int().min(1).max(168).default(12),
 });
 
 const generalConfigSchema = z.object({
@@ -148,6 +165,7 @@ const transmissionConfigSchema = z.object({
 });
 
 export type KindConfig = z.infer<typeof kindConfigSchema>;
+export type SportsConfig = z.infer<typeof sportsConfigSchema>;
 export type GeneralConfig = z.infer<typeof generalConfigSchema>;
 export type PlexConfig = z.infer<typeof plexConfigSchema>;
 export type ImportConfig = z.infer<typeof importConfigSchema>;
@@ -156,14 +174,21 @@ export type TransmissionConfig = z.infer<typeof transmissionConfigSchema>;
 export interface AppConfig {
   tv: KindConfig;
   movies: KindConfig;
+  sports: SportsConfig;
   general: GeneralConfig;
   plex: PlexConfig;
   importing: ImportConfig;
   transmission: TransmissionConfig;
 }
 
+const DOWNLOAD_FOLDER: Record<MediaKind, string> = {
+  tv: "tv",
+  movie: "movies",
+  sport: "sports",
+};
+
 function defaultDownloadDir(kind: MediaKind): string {
-  return path.join(os.homedir(), "Downloads", "tvarr", kind === "tv" ? "tv" : "movies");
+  return path.join(os.homedir(), "Downloads", "tvarr", DOWNLOAD_FOLDER[kind]);
 }
 
 /** The standard Plex layout, until a library scan proposes something else. */
@@ -191,6 +216,18 @@ export function defaultConfig(): AppConfig {
       grabBacklog: true,
       libraryDir: "",
       ...defaultTemplateFields("movie"),
+    },
+    sports: {
+      downloadDir: defaultDownloadDir("sport"),
+      quality: DEFAULT_SPORT_PROFILE,
+      // An event that has already happened is exactly what people want; the
+      // release always lands after the broadcast.
+      grabBacklog: true,
+      libraryDir: "",
+      ...defaultTemplateFields("sport"),
+      lookaheadDays: 60,
+      lookbehindDays: 21,
+      syncIntervalHours: 12,
     },
     general: generalConfigSchema.parse({}),
     plex: plexConfigSchema.parse({}),
@@ -246,6 +283,7 @@ export function getConfig(db: Db = getDb()): AppConfig {
   return {
     tv: readSection(db, "tv", kindConfigSchema, defaults.tv),
     movies: readSection(db, "movies", kindConfigSchema, defaults.movies),
+    sports: readSection(db, "sports", sportsConfigSchema, defaults.sports),
     general: readSection(db, "general", generalConfigSchema, defaults.general),
     plex: readSection(db, "plex", plexConfigSchema, defaults.plex),
     importing: readSection(db, "importing", importConfigSchema, defaults.importing),
@@ -270,14 +308,41 @@ export function saveTransmissionConfig(value: TransmissionConfig, db: Db = getDb
   writeSection(db, "transmission", transmissionConfigSchema.parse(value));
 }
 
+const SECTION_KEYS: Record<MediaKind, "tv" | "movies" | "sports"> = {
+  tv: "tv",
+  movie: "movies",
+  sport: "sports",
+};
+
 /** Config for one library, chosen by kind. */
 export function getKindConfig(kind: MediaKind, db: Db = getDb()): KindConfig {
   const config = getConfig(db);
-  return kind === "tv" ? config.tv : config.movies;
+  if (kind === "tv") return config.tv;
+  if (kind === "sport") return config.sports;
+  return config.movies;
 }
 
+export function getSportsConfig(db: Db = getDb()): SportsConfig {
+  return getConfig(db).sports;
+}
+
+/**
+ * Save one library's settings.
+ *
+ * Sports carry extra fields the shared form knows nothing about, so they are
+ * merged back over what is already stored rather than being dropped.
+ */
 export function saveKindConfig(kind: MediaKind, value: KindConfig, db: Db = getDb()): void {
-  writeSection(db, kind === "tv" ? "tv" : "movies", kindConfigSchema.parse(value));
+  if (kind === "sport") {
+    const merged = { ...getSportsConfig(db), ...value };
+    writeSection(db, "sports", sportsConfigSchema.parse(merged));
+    return;
+  }
+  writeSection(db, SECTION_KEYS[kind], kindConfigSchema.parse(value));
+}
+
+export function saveSportsConfig(value: SportsConfig, db: Db = getDb()): void {
+  writeSection(db, "sports", sportsConfigSchema.parse(value));
 }
 
 export function saveGeneralConfig(value: GeneralConfig, db: Db = getDb()): void {
@@ -296,6 +361,7 @@ export function parseQualityProfile(input: unknown): QualityProfile {
 export {
   qualitySchema,
   kindConfigSchema,
+  sportsConfigSchema,
   generalConfigSchema,
   plexConfigSchema,
   importConfigSchema,

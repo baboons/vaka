@@ -7,6 +7,7 @@ import {
   Rss,
   SlidersHorizontal,
   Terminal,
+  Trophy,
   Tv,
 } from "lucide-react";
 
@@ -18,6 +19,7 @@ import { LibraryNamingForm } from "@/components/library-naming-form";
 import { LibrarySettingsForm } from "@/components/library-settings-form";
 import { PlexSettingsForm } from "@/components/plex-settings-form";
 import { RelativeTime } from "@/components/relative-time";
+import { SportsSettingsForm } from "@/components/sports-settings-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dataDir, getDb } from "@/lib/core/db";
 import * as repo from "@/lib/core/repo";
@@ -46,7 +48,7 @@ export default function SettingsPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Settings"
-        description="TV and movies are configured separately — different folders, different quality targets."
+        description="TV, movies and sports are configured separately — different folders, different quality targets."
       />
 
       <div className="px-5 py-6 md:px-8 md:py-8">
@@ -63,6 +65,10 @@ export default function SettingsPage() {
             <TabsTrigger value="movies">
               <Clapperboard className="size-3.5" />
               Movies
+            </TabsTrigger>
+            <TabsTrigger value="sports">
+              <Trophy className="size-3.5" />
+              Sports
             </TabsTrigger>
             <TabsTrigger value="import">
               <FolderInput className="size-3.5" />
@@ -118,12 +124,32 @@ export default function SettingsPage() {
               </div>
             </TabsContent>
 
+            <TabsContent value="sports" className="space-y-5">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                Competitions come from ESPN&rsquo;s public schedule — no key, no account. Because
+                sports releases carry no episode number, tvarr scores each one against the
+                calendar and only downloads the matches it is sure about; the rest wait under a
+                competition&rsquo;s <span className="text-foreground/80">Releases</span> tab.
+              </p>
+              <div className="panel p-5">
+                <SportsSettingsForm initial={config.sports} />
+              </div>
+              <div className="panel p-5">
+                <h3 className="mb-1 text-[14px] font-semibold">Where finished events go</h3>
+                <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
+                  Used when importing is on. Events are grouped by competition and then by year.
+                </p>
+                <LibraryNamingForm kind="sport" initial={config.sports} />
+              </div>
+            </TabsContent>
+
             <TabsContent value="import">
               <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
                 tvarr can file finished downloads into your Plex library — renaming them, and
                 creating <span className="mono">Season 01</span> folders where they are missing.
-                Set the destination and naming under <span className="text-foreground/80">TV</span>{" "}
-                and <span className="text-foreground/80">Movies</span>.
+                Set the destination and naming under <span className="text-foreground/80">TV</span>,{" "}
+                <span className="text-foreground/80">Movies</span> and{" "}
+                <span className="text-foreground/80">Sports</span>.
               </p>
               <div className="panel p-5">
                 <ImportSettingsForm

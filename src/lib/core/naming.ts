@@ -6,6 +6,7 @@
  *
  *   TV      /TV/The Bear (2022)/Season 03/The Bear (2022) - S03E01 - Title.mkv
  *   Movies  /Movies/Dune Part Two (2024)/Dune Part Two (2024).mkv
+ *   Sports  /Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Garry.mkv
  *
  * Templates are stored in settings rather than hardcoded, because plenty of
  * libraries have their own long-standing convention and renaming an existing
@@ -19,7 +20,7 @@ import type { MediaKind } from "./types";
 export interface NamingTemplates {
   /** Folder for the title itself, e.g. "The Bear (2022)". */
   folder: string;
-  /** TV only, e.g. "Season 03". */
+  /** Grouping folder inside the title: "Season 03", or a year for sports. */
   season: string;
   /** File name without extension. */
   file: string;
@@ -37,8 +38,25 @@ export const PLEX_MOVIE_TEMPLATES: NamingTemplates = {
   file: "{title} ({year})",
 };
 
+/**
+ * Sports are grouped by competition and then by year.
+ *
+ * The date leads the file name because that is how anyone scans a folder of
+ * events, and because a competition's own titles repeat ("Fight Night") in a
+ * way episode titles do not.
+ *
+ *   /Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Machado Garry.mkv
+ */
+export const PLEX_SPORT_TEMPLATES: NamingTemplates = {
+  folder: "{title}",
+  season: "{season}",
+  file: "{title} - {airDate} - {episodeTitle}",
+};
+
 export function defaultTemplates(kind: MediaKind): NamingTemplates {
-  return kind === "tv" ? { ...PLEX_TV_TEMPLATES } : { ...PLEX_MOVIE_TEMPLATES };
+  if (kind === "tv") return { ...PLEX_TV_TEMPLATES };
+  if (kind === "sport") return { ...PLEX_SPORT_TEMPLATES };
+  return { ...PLEX_MOVIE_TEMPLATES };
 }
 
 export interface NamingValues {
@@ -49,6 +67,8 @@ export interface NamingValues {
   /** Multi-episode files render as E01-E02. */
   episodeEnd?: number | null;
   episodeTitle?: string | null;
+  /** YYYY-MM-DD. Sports events are identified by when they happened. */
+  airDate?: string | null;
   quality?: string | null;
   group?: string | null;
 }
@@ -76,7 +96,7 @@ function pad(value: number, width: number): string {
  * Render one template.
  *
  * Tokens: {title} {year} {season} {season:00} {episode} {episode:00}
- *         {episodeTitle} {quality} {group}
+ *         {episodeTitle} {airDate} {quality} {group}
  *
  * A token with no value collapses, and any separator left stranded by that
  * collapse is tidied up — so a movie with no year yields "Dune Part Two", not
@@ -107,6 +127,8 @@ export function renderTemplate(template: string, values: NamingValues): string {
         }
         case "episodeTitle":
           return values.episodeTitle ?? "";
+        case "airDate":
+          return values.airDate ? values.airDate.slice(0, 10) : "";
         case "quality":
           return values.quality ?? "";
         case "group":
@@ -165,7 +187,9 @@ export function buildDestination(input: DestinationInput): Destination {
   const folder = sanitizeSegment(renderTemplate(templates.folder, values), values.title);
   if (folder) segments.push(folder);
 
-  if (kind === "tv" && templates.season && values.season !== null && values.season !== undefined) {
+  // Movies live directly in their own folder; everything else is grouped by
+  // season — a year, for a competition.
+  if (kind !== "movie" && templates.season && values.season !== null && values.season !== undefined) {
     const season = sanitizeSegment(renderTemplate(templates.season, values), "Season");
     if (season) segments.push(season);
   }
@@ -186,29 +210,44 @@ export function previewDestination(
   libraryDir: string,
   templates: NamingTemplates,
 ): string {
-  const values: NamingValues =
-    kind === "tv"
-      ? {
-          title: "The Bear",
-          year: 2022,
-          season: 3,
-          episode: 1,
-          episodeTitle: "Tomorrow",
-          quality: "1080p WEB-DL",
-          group: "NTb",
-        }
-      : {
-          title: "Dune Part Two",
-          year: 2024,
-          quality: "2160p WEB-DL",
-          group: "FLUX",
-        };
+  const samples: Record<MediaKind, NamingValues> = {
+    tv: {
+      title: "The Bear",
+      year: 2022,
+      season: 3,
+      episode: 1,
+      episodeTitle: "Tomorrow",
+      quality: "1080p WEB-DL",
+      group: "NTb",
+    },
+    movie: {
+      title: "Dune Part Two",
+      year: 2024,
+      quality: "2160p WEB-DL",
+      group: "FLUX",
+    },
+    sport: {
+      title: "UFC",
+      season: 2026,
+      episode: 12,
+      episodeTitle: "UFC 330 Makhachev vs Machado Garry",
+      airDate: "2026-08-15",
+      quality: "1080p WEB-DL",
+      group: "VERUM",
+    },
+  };
+
+  const roots: Record<MediaKind, string> = {
+    tv: "/TV",
+    movie: "/Movies",
+    sport: "/Sports",
+  };
 
   return buildDestination({
     kind,
-    libraryDir: libraryDir || (kind === "tv" ? "/TV" : "/Movies"),
+    libraryDir: libraryDir || roots[kind],
     templates,
-    values,
+    values: samples[kind],
     extension: ".mkv",
   }).relative;
 }

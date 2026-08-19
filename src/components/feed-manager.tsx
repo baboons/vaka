@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils";
 import type { Feed, MediaKind } from "@/lib/core/types";
 
 const KINDS: Array<{ value: MediaKind | "any"; label: string }> = [
-  { value: "any", label: "TV + movies" },
+  { value: "any", label: "Everything" },
   { value: "tv", label: "TV only" },
   { value: "movie", label: "Movies only" },
+  { value: "sport", label: "Sports only" },
 ];
 
 export function FeedManager({ feeds }: { feeds: Feed[] }) {

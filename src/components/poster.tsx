@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Clapperboard, Tv } from "lucide-react";
+import { Clapperboard, Trophy, Tv } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { MediaKind } from "@/lib/core/types";
@@ -30,7 +30,7 @@ export function Poster({
   priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
-  const Icon = kind === "tv" ? Tv : Clapperboard;
+  const Icon = kind === "tv" ? Tv : kind === "sport" ? Trophy : Clapperboard;
 
   return (
     <div className={cn("poster-frame", className)}>
@@ -41,7 +41,13 @@ export function Poster({
           fill
           sizes={sizes}
           priority={priority}
-          className="object-cover"
+          // Competition badges are square logos, not 2:3 artwork — cropping
+          // them to a poster frame cuts the badge in half.
+          className={
+            kind === "sport"
+              ? "bg-surface-high object-contain p-4"
+              : "object-cover"
+          }
           onError={() => setFailed(true)}
         />
       ) : (

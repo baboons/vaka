@@ -12,11 +12,13 @@ import { Poster } from "@/components/poster";
 import { RelativeTime } from "@/components/relative-time";
 import { ReleaseList } from "@/components/release-list";
 import { SeasonList } from "@/components/season-list";
+import { SportSubscriptionForm } from "@/components/sport-subscription-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDb } from "@/lib/core/db";
 import { listCachedReleases } from "@/lib/core/engine";
 import * as repo from "@/lib/core/repo";
-import { getConfig } from "@/lib/core/settings";
+import { getKindConfig } from "@/lib/core/settings";
+import { findLeague } from "@/lib/core/sports";
 import { resolveTargetDir } from "@/lib/core/grab";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +32,13 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
   const media = repo.getMedia(mediaId, db);
   if (!media) notFound();
 
-  const config = getConfig(db);
-  const kindConfig = media.kind === "tv" ? config.tv : config.movies;
-  const episodes = media.kind === "tv" ? repo.listEpisodes(media.id, db) : [];
-  const counts = media.kind === "tv" ? repo.countEpisodes(media.id, db) : null;
+  const kindConfig = getKindConfig(media.kind, db);
+  const isSport = media.kind === "sport";
+  const league = isSport && media.sport ? findLeague(media.sport.league) : null;
+
+  // Shows and competitions both keep a list of parts; a movie is wanted whole.
+  const episodes = media.kind === "movie" ? [] : repo.listEpisodes(media.id, db);
+  const counts = media.kind === "movie" ? null : repo.countEpisodes(media.id, db);
   const releases = listCachedReleases(media.id, db);
   const history = repo.listHistory({ mediaId: media.id, limit: 30 }, db);
   const destination = resolveTargetDir(media, kindConfig);
@@ -56,7 +61,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
 
           <div className="min-w-0 flex-1">
             <p className="label-mono mb-2">
-              {media.kind === "tv" ? "TV show" : "Movie"}
+              {media.kind === "tv" ? "TV show" : isSport ? "Competition" : "Movie"}
               {media.network && ` · ${media.network}`}
             </p>
 
@@ -66,6 +71,20 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
 
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {media.year && <Pill>{media.year}</Pill>}
+              {isSport && media.sport && (
+                <>
+                  <Pill>
+                    {media.sport.teams.length
+                      ? `${media.sport.teams.length} team${media.sport.teams.length === 1 ? "" : "s"}`
+                      : "Every event"}
+                  </Pill>
+                  <Pill tone={media.sport.autoGrabUncertain ? "signal" : "neutral"}>
+                    {media.sport.autoGrabUncertain
+                      ? "grabs uncertain matches"
+                      : "confirms uncertain matches"}
+                  </Pill>
+                </>
+              )}
               {media.status && (
                 <Pill tone={media.status.toLowerCase() === "running" ? "online" : "neutral"}>
                   {media.status}
@@ -77,7 +96,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
               ))}
               {counts && (
                 <Pill tone={counts.wanted > 0 ? "signal" : "online"}>
-                  {counts.have}/{counts.total} episodes
+                  {counts.have}/{counts.total} {isSport ? "events" : "episodes"}
                 </Pill>
               )}
               {media.kind === "movie" && (
@@ -130,7 +149,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
                 variant="ghost"
                 size="sm"
               >
-                Refresh info
+                {isSport ? "Refresh calendar" : "Refresh info"}
               </ActionButton>
 
               {media.kind === "movie" && media.state !== "wanted" && (
@@ -148,7 +167,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
                 title={`Remove ${media.title}?`}
                 description="This removes it from your library and stops the watcher looking for it. Files already downloaded are left alone."
                 confirmLabel="Remove"
-                redirectTo={media.kind === "tv" ? "/tv" : "/movies"}
+                redirectTo={media.kind === "tv" ? "/tv" : isSport ? "/sports" : "/movies"}
               >
                 <Trash2 className="size-3.5" />
                 Remove
@@ -163,9 +182,11 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
       </header>
 
       <div className="px-5 py-6 md:px-8 md:py-8">
-        <Tabs defaultValue={media.kind === "tv" ? "episodes" : "releases"}>
+        <Tabs defaultValue={media.kind === "movie" ? "releases" : "episodes"}>
           <TabsList>
-            {media.kind === "tv" && <TabsTrigger value="episodes">Episodes</TabsTrigger>}
+            {media.kind !== "movie" && (
+              <TabsTrigger value="episodes">{isSport ? "Events" : "Episodes"}</TabsTrigger>
+            )}
             <TabsTrigger value="releases">
               Releases
               {releases.length > 0 && (
@@ -174,18 +195,44 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
                 </span>
               )}
             </TabsTrigger>
+            {isSport && <TabsTrigger value="following">Following</TabsTrigger>}
             <TabsTrigger value="quality">Quality</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
-          {media.kind === "tv" && (
+          {media.kind !== "movie" && (
             <TabsContent value="episodes" className="mt-5">
-              <SeasonList mediaId={media.id} episodes={episodes} />
+              <SeasonList mediaId={media.id} episodes={episodes} kind={media.kind} />
+            </TabsContent>
+          )}
+
+          {isSport && media.sport && league && (
+            <TabsContent value="following" className="mt-5">
+              <div className="panel p-5">
+                <h3 className="mb-1 text-[14px] font-semibold">How this is followed</h3>
+                <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
+                  Events come from ESPN&rsquo;s schedule for {league.fullName}. Narrowing the
+                  teams also narrows what is stored, so the calendar stays the size of what you
+                  actually watch.
+                </p>
+                <SportSubscriptionForm
+                  mediaId={media.id}
+                  format={league.format}
+                  subscription={media.sport}
+                />
+              </div>
             </TabsContent>
           )}
 
           <TabsContent value="releases" className="mt-5">
             <SectionTitle>Seen in your feeds</SectionTitle>
+            {isSport && (
+              <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
+                Sports releases carry no episode number, so each one is scored against the
+                calendar. Anything tvarr is not sure enough about is listed here rather than
+                downloaded — grab it yourself if it is the right event.
+              </p>
+            )}
             <ReleaseList releases={releases} mediaId={media.id} />
           </TabsContent>
 

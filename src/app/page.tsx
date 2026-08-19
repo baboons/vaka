@@ -29,6 +29,7 @@ export default function DashboardPage() {
 
   const shows = repo.listMedia({ kind: "tv" }, db);
   const movies = repo.listMedia({ kind: "movie" }, db);
+  const competitions = repo.listMedia({ kind: "sport" }, db);
   const feeds = repo.listFeeds(false, db);
   const upcoming = repo.listUpcoming(14, db);
   const history = repo.listHistory({ limit: 12 }, db);
@@ -43,8 +44,14 @@ export default function DashboardPage() {
     (movie) => movie.monitored && movie.state === "wanted",
   ).length;
 
+  const wantedEvents = competitions.reduce(
+    (total, competition) => total + repo.countEpisodes(competition.id, db).wanted,
+    0,
+  );
+
   const brokenFeeds = feeds.filter((feed) => feed.enabled && feed.lastStatus === "error");
-  const needsSetup = feeds.length === 0 || shows.length + movies.length === 0;
+  const libraryCount = shows.length + movies.length + competitions.length;
+  const needsSetup = feeds.length === 0 || libraryCount === 0;
 
   return (
     <>
@@ -57,7 +64,7 @@ export default function DashboardPage() {
       />
 
       <div className="space-y-10 px-5 py-6 md:px-8 md:py-8">
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Stat label="Shows followed" value={shows.filter((s) => s.monitored).length} />
           <Stat label="Movies wanted" value={wantedMovies} tone={wantedMovies ? "signal" : undefined} />
           <Stat
@@ -65,10 +72,15 @@ export default function DashboardPage() {
             value={wantedEpisodes}
             tone={wantedEpisodes ? "signal" : undefined}
           />
+          <Stat
+            label="Events wanted"
+            value={wantedEvents}
+            tone={wantedEvents ? "signal" : undefined}
+          />
           <Stat label="Grabbed this week" value={grabbedThisWeek} tone="online" />
         </section>
 
-        {needsSetup && <SetupChecklist hasFeeds={feeds.length > 0} hasLibrary={shows.length + movies.length > 0} />}
+        {needsSetup && <SetupChecklist hasFeeds={feeds.length > 0} hasLibrary={libraryCount > 0} />}
 
         {brokenFeeds.length > 0 && (
           <div className="panel border-alert/40 bg-alert/5 px-4 py-3">
@@ -105,7 +117,7 @@ export default function DashboardPage() {
               <EmptyState
                 icon={<CalendarClock className="size-6" />}
                 title="Nothing scheduled"
-                description="Episodes appear here once a show you follow has announced air dates."
+                description="Episodes and events appear here once something you follow has dates announced."
               />
             ) : (
               <ul className="panel divide-y divide-border">
@@ -115,7 +127,7 @@ export default function DashboardPage() {
                       <Poster
                         src={episode.poster}
                         alt={episode.mediaTitle}
-                        kind="tv"
+                        kind={episode.mediaKind}
                         sizes="36px"
                       />
                     </div>
@@ -125,10 +137,18 @@ export default function DashboardPage() {
                         {episode.mediaTitle}
                       </p>
                       <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                        <span className="mono text-foreground/70">
-                          S{pad(episode.season)}E{pad(episode.number)}
-                        </span>
-                        {episode.title && ` · ${episode.title}`}
+                        {/* A sports event has no episode number, and its own
+                            title already says which event it is. */}
+                        {episode.mediaKind === "sport" ? (
+                          (episode.title ?? "Event")
+                        ) : (
+                          <>
+                            <span className="mono text-foreground/70">
+                              S{pad(episode.season)}E{pad(episode.number)}
+                            </span>
+                            {episode.title && ` · ${episode.title}`}
+                          </>
+                        )}
                       </p>
                     </div>
 

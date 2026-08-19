@@ -1,11 +1,28 @@
 /**
  * Shared domain types for tvarr.
  *
- * A single `media` row models both a TV show and a movie; `kind` discriminates.
- * TV shows own `episodes` rows, movies do not — a movie is wanted as a whole.
+ * A single `media` row models a TV show, a movie or a sports competition;
+ * `kind` discriminates. TV shows own `episodes` rows and so do competitions —
+ * an event is an episode with a date instead of a number. Movies do not: a
+ * movie is wanted as a whole.
  */
 
-export type MediaKind = "tv" | "movie";
+export type MediaKind = "tv" | "movie" | "sport";
+
+export const MEDIA_KINDS = ["tv", "movie", "sport"] as const;
+
+/** Singular noun for one entry of a library, for prose in the interface. */
+export const KIND_NOUNS: Record<MediaKind, string> = {
+  tv: "show",
+  movie: "movie",
+  sport: "competition",
+};
+
+export const KIND_LABELS: Record<MediaKind, string> = {
+  tv: "TV shows",
+  movie: "Movies",
+  sport: "Sports",
+};
 
 /** Ordered worst -> best. Index doubles as the ranking score. */
 export const RESOLUTIONS = ["sd", "480p", "576p", "720p", "1080p", "2160p"] as const;
@@ -117,6 +134,148 @@ export const DEFAULT_MOVIE_PROFILE: QualityProfile = {
   allowSeasonPacks: false,
 };
 
+export const DEFAULT_SPORT_PROFILE: QualityProfile = {
+  allowed: ["720p", "1080p"],
+  preferred: "1080p",
+  // Sport is broadcast once; a better rip of last night's game is not worth
+  // the second download, and re-grabbing would fight with the seeding rules.
+  upgrade: false,
+  sources: [],
+  minSeeders: 1,
+  maxSizeGb: 0,
+  minSizeMb: 0,
+  requiredWords: [],
+  bannedWords: [],
+  preferredWords: [],
+  allowSeasonPacks: false,
+};
+
+/* ------------------------------------------------------------------ */
+/* Sports                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Which part of an event a release contains.
+ *
+ * A single fight card or race weekend is posted several times over — prelims
+ * and main card as separate torrents, then highlights, then the weigh-in —
+ * and most of those are not what anyone means by "get me the fight". Reading
+ * the part out of the name is what stops a 40-minute highlight reel being
+ * filed as the event.
+ */
+export const SPORT_SESSIONS = [
+  "full-event",
+  "main-card",
+  "prelims",
+  "early-prelims",
+  "race",
+  "sprint",
+  "qualifying",
+  "practice",
+  "highlights",
+  "extra",
+] as const;
+export type SportSession = (typeof SPORT_SESSIONS)[number];
+
+export const SESSION_LABELS: Record<SportSession, string> = {
+  "full-event": "Full event",
+  "main-card": "Main card",
+  prelims: "Prelims",
+  "early-prelims": "Early prelims",
+  race: "Race",
+  sprint: "Sprint",
+  qualifying: "Qualifying",
+  practice: "Practice",
+  highlights: "Highlights",
+  extra: "Build-up & extras",
+};
+
+export const SESSION_HINTS: Record<SportSession, string> = {
+  "full-event": "The whole broadcast, however it is labelled",
+  "main-card": "Numbered fights, the televised card",
+  prelims: "Undercard before the main card",
+  "early-prelims": "The first fights of the night",
+  race: "The race itself",
+  sprint: "Sprint race",
+  qualifying: "Qualifying session",
+  practice: "Free practice sessions",
+  highlights: "Condensed games, extended highlights, recaps",
+  extra: "Weigh-ins, press conferences, countdown shows",
+};
+
+/** How a competition's events are shaped, which decides how they are named. */
+export type SportFormat = "card" | "fixture" | "race";
+
+/**
+ * What a release is checked against for one event.
+ *
+ * Worked out once, when the calendar is synced, and stored on the event row.
+ * Deriving it later from a display title would lose the abbreviations and
+ * short names that half of all releases actually use.
+ */
+export interface SportEventMeta {
+  /** "UFC 330" -> 330. */
+  eventNumber: number | null;
+  /** Display names, for showing what the event is. */
+  competitors: string[];
+  /**
+   * One group per subject of the event — the two teams, the two fighters, the
+   * circuit. A group matches if a release names it any of its ways, and it is
+   * how many *groups* are named that decides confidence.
+   */
+  identityGroups: string[][];
+}
+
+/**
+ * A competition someone follows, stored on the media row.
+ *
+ * `teams` is the difference between following the NHL (1,300 games a season)
+ * and following the Bruins. It filters at sync time, so unfollowed fixtures
+ * are never written to the database at all.
+ */
+export interface SportSubscription {
+  /** Catalogue entry, e.g. "ufc" or "eng.1". */
+  league: string;
+  /** Competitor display names. Empty means every event in the competition. */
+  teams: string[];
+  /** Parts of an event that may be grabbed. */
+  sessions: SportSession[];
+  /**
+   * Grab a release even when the match is only probable.
+   *
+   * Off by default: sports release names carry no equivalent of `S03E01`, so
+   * a middling score means "this is plausibly the right event", and the
+   * honest thing to do with a maybe is to show it rather than download it.
+   */
+  autoGrabUncertain: boolean;
+}
+
+export const DEFAULT_SPORT_SUBSCRIPTION: SportSubscription = {
+  league: "",
+  teams: [],
+  sessions: ["full-event"],
+  autoGrabUncertain: false,
+};
+
+/** Default sessions for a competition, by the shape of its events. */
+export function defaultSessions(format: SportFormat): SportSession[] {
+  if (format === "card") return ["full-event", "main-card", "prelims"];
+  if (format === "race") return ["full-event", "race"];
+  return ["full-event"];
+}
+
+/** Sessions worth offering for a competition of this shape. */
+export function sessionsFor(format: SportFormat): SportSession[] {
+  const common: SportSession[] = ["full-event"];
+  if (format === "card") {
+    return [...common, "main-card", "prelims", "early-prelims", "highlights", "extra"];
+  }
+  if (format === "race") {
+    return [...common, "race", "sprint", "qualifying", "practice", "highlights", "extra"];
+  }
+  return [...common, "highlights", "extra"];
+}
+
 /** Everything the parser can pull out of a scene-style release name. */
 export interface ParsedRelease {
   /** Raw release title, unchanged. */
@@ -169,6 +328,8 @@ export interface Media {
   searchTerms: string[];
   /** Overrides the destination folder derived from settings. */
   folder: string | null;
+  /** Sports only: which competition this is, and which of it to follow. */
+  sport: SportSubscription | null;
   /** Movies only; TV progress lives on the episode rows. */
   state: MediaState;
   grabbedQuality: string | null;
@@ -182,6 +343,7 @@ export interface Episode {
   id: number;
   mediaId: number;
   providerId: string | null;
+  /** Sports: the season year. */
   season: number;
   number: number;
   title: string | null;
@@ -191,6 +353,8 @@ export interface Episode {
   state: EpisodeState;
   grabbedQuality: string | null;
   grabbedAt: string | null;
+  /** Sports only: what a release has to match to be this event. */
+  sport: SportEventMeta | null;
 }
 
 export interface Feed {
@@ -249,7 +413,8 @@ export type JobType =
   | "search_media"
   | "grab_item"
   | "sync_plex"
-  | "import_scan";
+  | "import_scan"
+  | "sync_sports";
 
 export type JobState = "pending" | "running" | "done" | "failed";
 

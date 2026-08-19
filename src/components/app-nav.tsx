@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Plus,
   Settings,
+  Trophy,
   Tv,
 } from "lucide-react";
 
@@ -17,6 +18,7 @@ const ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tv", label: "TV shows", icon: Tv },
   { href: "/movies", label: "Movies", icon: Clapperboard },
+  { href: "/sports", label: "Sports", icon: Trophy },
   { href: "/add", label: "Add", icon: Plus },
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },

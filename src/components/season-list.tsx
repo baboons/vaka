@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Episode, EpisodeState } from "@/lib/core/types";
+import type { Episode, EpisodeState, MediaKind } from "@/lib/core/types";
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
@@ -36,13 +36,23 @@ const STATE_META: Record<
   skipped: { label: "Skipped", tone: "neutral", icon: MinusCircle },
 };
 
+/**
+ * Episodes grouped by season — or, for a competition, events grouped by year.
+ *
+ * They are the same rows underneath: a sports event is an episode whose
+ * season is the year it belongs to and whose identity is a date rather than a
+ * number, so only the labelling differs.
+ */
 export function SeasonList({
   mediaId,
   episodes,
+  kind = "tv",
 }: {
   mediaId: number;
   episodes: Episode[];
+  kind?: MediaKind;
 }) {
+  const isSport = kind === "sport";
   const seasons = [...new Set(episodes.map((episode) => episode.season))].sort((a, b) => a - b);
 
   // Open the newest season by default — that is where the action is.
@@ -53,7 +63,9 @@ export function SeasonList({
   if (!episodes.length) {
     return (
       <p className="panel px-4 py-6 text-center text-[13px] text-muted-foreground">
-        No episodes have been published for this show yet.
+        {isSport
+          ? "No events on the calendar yet. Refresh the calendar, or widen the window under Settings → Sports."
+          : "No episodes have been published for this show yet."}
       </p>
     );
   }
@@ -84,7 +96,11 @@ export function SeasonList({
               >
                 <span className="flex flex-1 items-baseline gap-2.5">
                   <span className="text-[14px] font-semibold tracking-[-0.01em]">
-                    {season === 0 ? "Specials" : `Season ${season}`}
+                    {isSport
+                      ? String(season)
+                      : season === 0
+                        ? "Specials"
+                        : `Season ${season}`}
                   </span>
                   <span className="mono text-[11.5px] text-muted-foreground">
                     <span className={have === seasonEpisodes.length ? "text-online" : ""}>
@@ -101,6 +117,7 @@ export function SeasonList({
                   mediaId={mediaId}
                   season={season}
                   monitored={monitoredCount > 0}
+                  isSport={isSport}
                 />
               </span>
             </div>
@@ -108,7 +125,7 @@ export function SeasonList({
             <AccordionContent className="pb-0">
               <ul className="divide-y divide-border border-t border-border">
                 {seasonEpisodes.map((episode) => (
-                  <EpisodeRow key={episode.id} episode={episode} />
+                  <EpisodeRow key={episode.id} episode={episode} isSport={isSport} />
                 ))}
               </ul>
             </AccordionContent>
@@ -124,10 +141,12 @@ function SeasonToggle({
   mediaId,
   season,
   monitored,
+  isSport,
 }: {
   mediaId: number;
   season: number;
   monitored: boolean;
+  isSport: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -145,12 +164,18 @@ function SeasonToggle({
         })
       }
     >
-      {monitored ? "Ignore season" : "Monitor season"}
+      {monitored
+        ? isSport
+          ? "Ignore year"
+          : "Ignore season"
+        : isSport
+          ? "Monitor year"
+          : "Monitor season"}
     </Button>
   );
 }
 
-function EpisodeRow({ episode }: { episode: Episode }) {
+function EpisodeRow({ episode, isSport }: { episode: Episode; isSport: boolean }) {
   const meta = STATE_META[episode.state];
   const Icon = meta.icon;
   const [pending, startTransition] = useTransition();
@@ -171,7 +196,7 @@ function EpisodeRow({ episode }: { episode: Episode }) {
       )}
     >
       <span className="mono w-11 shrink-0 text-[11.5px] text-muted-foreground">
-        E{pad(episode.number)}
+        {isSport ? (episode.airDate?.slice(5, 10).replace("-", "/") ?? "—") : `E${pad(episode.number)}`}
       </span>
 
       <div className="min-w-0 flex-1">
@@ -183,7 +208,7 @@ function EpisodeRow({ episode }: { episode: Episode }) {
               <RelativeTime value={episode.airDate} />
             </>
           ) : (
-            "No air date"
+            isSport ? "No date" : "No air date"
           )}
           {episode.grabbedQuality && (
             <span className="mono text-online">· {episode.grabbedQuality}</span>

@@ -27,10 +27,15 @@ export function expandHome(input: string): string {
   return input;
 }
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS media (
+/**
+ * The media table, parameterised by name so the same definition can be used
+ * both to create it and to rebuild it during a migration.
+ */
+function mediaTable(name: string): string {
+  return `
+CREATE TABLE IF NOT EXISTS ${name} (
   id            INTEGER PRIMARY KEY,
-  kind          TEXT    NOT NULL CHECK (kind IN ('tv','movie')),
+  kind          TEXT    NOT NULL CHECK (kind IN ('tv','movie','sport')),
   provider      TEXT    NOT NULL,
   provider_id   TEXT    NOT NULL,
   imdb_id       TEXT,
@@ -48,6 +53,7 @@ CREATE TABLE IF NOT EXISTS media (
   quality       TEXT    NOT NULL,
   search_terms  TEXT    NOT NULL DEFAULT '[]',
   folder        TEXT,
+  sport         TEXT,
   state         TEXT    NOT NULL DEFAULT 'wanted',
   grabbed_quality TEXT,
   grabbed_at    TEXT,
@@ -56,6 +62,11 @@ CREATE TABLE IF NOT EXISTS media (
   refreshed_at  TEXT,
   UNIQUE (provider, provider_id)
 );
+`;
+}
+
+const SCHEMA = `
+${mediaTable("media")}
 
 CREATE INDEX IF NOT EXISTS idx_media_kind ON media (kind, monitored);
 
@@ -72,10 +83,15 @@ CREATE TABLE IF NOT EXISTS episodes (
   state         TEXT    NOT NULL DEFAULT 'wanted',
   grabbed_quality TEXT,
   grabbed_at    TEXT,
+  sport         TEXT,
   UNIQUE (media_id, season, number)
 );
 
 CREATE INDEX IF NOT EXISTS idx_episodes_media ON episodes (media_id, season, number);
+-- Sports events keep their row across refreshes even as the calendar grows,
+-- so they are keyed by the provider's own event id rather than by number.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_episodes_provider
+  ON episodes (media_id, provider_id) WHERE provider_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_episodes_state ON episodes (state, monitored);
 CREATE INDEX IF NOT EXISTS idx_episodes_air ON episodes (air_date);
 
@@ -188,7 +204,65 @@ const ADDED_COLUMNS: Array<{ table: string; column: string; definition: string }
   // How many times filing this download has been attempted, so a download
   // that was merely unfinished at the time gets another chance.
   { table: "imports", column: "attempts", definition: "INTEGER NOT NULL DEFAULT 1" },
+  // Which competition a sports entry follows, and which parts of it.
+  { table: "media", column: "sport", definition: "TEXT" },
+  // Per-event facts a sports release is matched against: the event number and
+  // the names of whoever is playing. Derived at sync time so matching never
+  // has to guess them back out of a display title.
+  { table: "episodes", column: "sport", definition: "TEXT" },
 ];
+
+/**
+ * Widen the `kind` constraint so sports entries can be stored.
+ *
+ * SQLite cannot alter a CHECK constraint, so the table is rebuilt. This runs
+ * once, guarded by the constraint's own text, and copies only the columns the
+ * old table actually had — the new ones are added by {@link applyMigrations}
+ * straight afterwards.
+ */
+function widenMediaKinds(db: Db): void {
+  const table = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'media'")
+    .get() as { sql: string } | undefined;
+
+  if (!table?.sql) return;
+  if (!/CHECK\s*\(\s*kind\s+IN/i.test(table.sql)) return;
+  if (/'sport'/.test(table.sql)) return;
+
+  const columns = (db.prepare("PRAGMA table_info(media)").all() as Array<{ name: string }>).map(
+    (column) => `"${column.name}"`,
+  );
+  const columnList = columns.join(", ");
+
+  // Foreign keys are switched off for the swap: `episodes` points at `media`,
+  // and dropping the old table would otherwise cascade its rows away.
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      // Another process may have won the race while we waited for the lock.
+      const current = db
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'media'")
+        .get() as { sql: string } | undefined;
+      if (current?.sql && /'sport'/.test(current.sql)) {
+        db.exec("ROLLBACK");
+        return;
+      }
+
+      db.exec(mediaTable("media_rebuilt"));
+      db.exec(`INSERT INTO media_rebuilt (${columnList}) SELECT ${columnList} FROM media`);
+      db.exec("DROP TABLE media");
+      db.exec("ALTER TABLE media_rebuilt RENAME TO media");
+      db.exec("CREATE INDEX IF NOT EXISTS idx_media_kind ON media (kind, monitored)");
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+}
 
 function applyMigrations(db: Db): void {
   for (const { table, column, definition } of ADDED_COLUMNS) {
@@ -213,6 +287,7 @@ export function getDb(): Db {
   db.pragma("busy_timeout = 5000");
   db.pragma("synchronous = NORMAL");
   db.exec(SCHEMA);
+  widenMediaKinds(db);
   applyMigrations(db);
 
   cached = db;

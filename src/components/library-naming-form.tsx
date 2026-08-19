@@ -22,6 +22,7 @@ const TOKENS = [
   "{episode}",
   "{episode:00}",
   "{episodeTitle}",
+  "{airDate}",
   "{quality}",
   "{group}",
 ];
@@ -32,6 +33,30 @@ const TOKENS = [
  * "Analyse" reads what is already on disk and proposes templates that match
  * it, rather than renaming a library someone has kept tidy for years.
  */
+const FOLDER_LABELS: Record<MediaKind, string> = {
+  tv: "TV library folder",
+  movie: "Movie library folder",
+  sport: "Sports library folder",
+};
+
+const FOLDER_PLACEHOLDERS: Record<MediaKind, string> = {
+  tv: "e.g. /media/TV",
+  movie: "e.g. /media/Movies",
+  sport: "e.g. /media/Sports",
+};
+
+const FILED_NOUNS: Record<MediaKind, string> = {
+  tv: "episodes",
+  movie: "films",
+  sport: "events",
+};
+
+const SAVE_LABELS: Record<MediaKind, string> = {
+  tv: "TV",
+  movie: "movie",
+  sport: "sports",
+};
+
 export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial: KindConfig }) {
   const [libraryDir, setLibraryDir] = useState(initial.libraryDir);
   const [templates, setTemplates] = useState<NamingTemplates>({
@@ -75,7 +100,7 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
     <div className="space-y-6">
       <div className="space-y-2">
         <Label className="label-mono flex items-center gap-2">
-          {kind === "tv" ? "TV library folder" : "Movie library folder"}
+          {FOLDER_LABELS[kind]}
           {/*
             An empty path is easy to mistake for the placeholder, and the
             consequence is silent: imports are skipped with "no library folder
@@ -87,7 +112,7 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
           <Input
             value={libraryDir}
             onChange={(event) => setLibraryDir(event.target.value)}
-            placeholder={kind === "tv" ? "e.g. /media/TV" : "e.g. /media/Movies"}
+            placeholder={FOLDER_PLACEHOLDERS[kind]}
             className="mono text-[12.5px]"
           />
           <Button
@@ -106,10 +131,10 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
         <p className="text-[11.5px] leading-snug text-muted-foreground">
           Where Plex reads this library from.{" "}
           {libraryDir.trim() ? (
-            <>Finished {kind === "tv" ? "episodes" : "films"} are filed in here.</>
+            <>Finished {FILED_NOUNS[kind]} are filed in here.</>
           ) : (
             <span className="text-alert">
-              While this is empty, {kind === "tv" ? "episodes" : "films"} are downloaded but never
+              While this is empty, {FILED_NOUNS[kind]} are downloaded but never
               filed — imports are skipped with “no library folder is configured”.
             </span>
           )}
@@ -149,10 +174,14 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
           value={templates.folder}
           onChange={(folder) => setTemplates({ ...templates, folder })}
         />
-        {kind === "tv" && (
+        {kind !== "movie" && (
           <TemplateField
-            label="Season folder"
-            hint="Created automatically when a season has no folder yet."
+            label={kind === "sport" ? "Year folder" : "Season folder"}
+            hint={
+              kind === "sport"
+                ? "Created automatically. Sports events are grouped by the year they belong to."
+                : "Created automatically when a season has no folder yet."
+            }
             value={templates.season}
             onChange={(season) => setTemplates({ ...templates, season })}
           />
@@ -199,7 +228,7 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
 
       <Button onClick={save} disabled={saving}>
         {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-        Save {kind === "tv" ? "TV" : "movie"} naming
+        Save {SAVE_LABELS[kind]} naming
       </Button>
     </div>
   );

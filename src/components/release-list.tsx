@@ -17,6 +17,10 @@ function formatSize(bytes: number | null): string | null {
  * Cached feed releases for one title, with the accept/reject verdict shown.
  * This is where you look when something did not download and you want to know
  * whether the release was never seen, or seen and turned down.
+ *
+ * For a competition it does one more job: a sports release carries no episode
+ * number, so anything tvarr could not identify with confidence is listed here
+ * with its score and what that score was made of, for you to grab or ignore.
  */
 export function ReleaseList({
   releases,
@@ -47,6 +51,11 @@ export function ReleaseList({
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <Pill tone={release.decision.ok ? "online" : "neutral"}>{release.label}</Pill>
                 <Pill tone="info">{release.quality}</Pill>
+                {release.confidence && (
+                  <Pill tone={release.confidence.confident ? "online" : "signal"}>
+                    {release.confidence.confident ? "sure" : "maybe"} · {release.confidence.score}
+                  </Pill>
+                )}
                 {release.seeders !== null && (
                   <span className="mono text-[10.5px] text-muted-foreground">
                     {release.seeders} seeders
@@ -67,9 +76,18 @@ export function ReleaseList({
                 </span>
               </div>
 
+              {release.confidence && (
+                <p className="mt-1.5 text-[11.5px] text-muted-foreground">
+                  Matched on {release.confidence.reasons.join(", ")}.
+                </p>
+              )}
+
               {!release.decision.ok && (
                 <p className="mt-1.5 text-[11.5px] text-muted-foreground">
-                  Rejected — {release.decision.reason}
+                  {release.confidence && !release.confidence.confident
+                    ? "Waiting for you — "
+                    : "Rejected — "}
+                  {release.decision.reason}
                 </p>
               )}
             </div>

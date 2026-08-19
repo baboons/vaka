@@ -11,7 +11,11 @@
 import { revalidatePath } from "next/cache";
 
 import { getDb } from "@/lib/core/db";
-import { addMedia as addMediaToLibrary, type MonitorMode } from "@/lib/core/engine";
+import {
+  addMedia as addMediaToLibrary,
+  addSport,
+  type MonitorMode,
+} from "@/lib/core/engine";
 import { fetchFeed } from "@/lib/core/feed";
 import { checkDownloadDir } from "@/lib/core/grab";
 import { inspectLibrary, type LibraryReport } from "@/lib/core/inspect-library";
@@ -29,16 +33,25 @@ import {
   saveImportConfig,
   saveKindConfig,
   savePlexConfig,
+  saveSportsConfig,
   saveTransmissionConfig,
+  sportsConfigSchema,
   transmissionConfigSchema,
   type GeneralConfig,
   type ImportConfig,
   type KindConfig,
   type PlexConfig,
+  type SportsConfig,
   type TransmissionConfig,
 } from "@/lib/core/settings";
+import * as sports from "@/lib/core/sports";
 import * as transmission from "@/lib/core/transmission";
-import type { EpisodeState, MediaKind, QualityProfile } from "@/lib/core/types";
+import type {
+  EpisodeState,
+  MediaKind,
+  QualityProfile,
+  SportSession,
+} from "@/lib/core/types";
 
 export interface ActionResult {
   ok: boolean;
@@ -148,6 +161,129 @@ export async function setMovieState(
   if (state === "wanted") repo.enqueueJob("search_media", { mediaId });
   refreshAllViews();
   return { ok: true, message: state === "wanted" ? "Marked as wanted" : "Ignored" };
+}
+
+/* ------------------------------------------------------------------ */
+/* Sports                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface FollowCompetitionInput {
+  leagueId: string;
+  teams: string[];
+  sessions: SportSession[];
+  autoGrabUncertain: boolean;
+  quality: QualityProfile;
+}
+
+/**
+ * Follow a competition and pull in its calendar.
+ *
+ * The calendar fetch happens here rather than in a background job so that the
+ * confirmation can say how many events were found — following a league and
+ * being shown an empty page is indistinguishable from it not having worked.
+ */
+export async function followCompetition(
+  input: FollowCompetitionInput,
+): Promise<ActionResult> {
+  const db = getDb();
+  const league = sports.findLeague(input.leagueId);
+  if (!league) return { ok: false, message: "That competition is not in the catalogue" };
+
+  const existing = repo.findMediaByProvider("espn", league.id, db);
+  if (existing) return { ok: false, message: `You already follow ${existing.title}` };
+
+  if (!input.sessions.length) {
+    return { ok: false, message: "Pick at least one part of an event to download" };
+  }
+
+  try {
+    const media = await addSport(
+      {
+        leagueId: league.id,
+        teams: input.teams,
+        sessions: input.sessions,
+        autoGrabUncertain: input.autoGrabUncertain,
+        quality: input.quality,
+      },
+      db,
+    );
+
+    const events = repo.countEpisodes(media.id, db).total;
+    refreshAllViews();
+    return {
+      ok: true,
+      message: events
+        ? `Following ${media.title} — ${events} event${events === 1 ? "" : "s"} on the calendar`
+        : `Following ${media.title} — no events scheduled in the current window yet`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Could not follow that competition",
+    };
+  }
+}
+
+/** Change which teams and which parts of an event are followed. */
+export async function updateSportSubscription(
+  mediaId: number,
+  patch: { teams?: string[]; sessions?: SportSession[]; autoGrabUncertain?: boolean },
+): Promise<ActionResult> {
+  const db = getDb();
+  const media = repo.getMedia(mediaId, db);
+  if (!media?.sport) return { ok: false, message: "That is not a followed competition" };
+
+  const sessions = patch.sessions ?? media.sport.sessions;
+  if (!sessions.length) {
+    return { ok: false, message: "Pick at least one part of an event to download" };
+  }
+
+  repo.updateMedia(mediaId, { sport: { ...media.sport, ...patch, sessions } }, db);
+
+  // A changed team filter changes which fixtures belong in the calendar, so
+  // the calendar is rebuilt before anything is searched for.
+  repo.enqueueJob("refresh_media", { mediaId }, db);
+  repo.enqueueJob("search_media", { mediaId }, db);
+  refreshAllViews();
+
+  return { ok: true, message: "Saved — refreshing the calendar" };
+}
+
+/** Teams that can be followed within a competition, for the add dialog. */
+export async function competitionTeams(
+  leagueId: string,
+): Promise<{ teams: sports.LeagueTeam[]; error: string | null }> {
+  try {
+    return { teams: await sports.listTeams(leagueId, getDb()), error: null };
+  } catch (error) {
+    return {
+      teams: [],
+      error: error instanceof Error ? error.message : "Could not load the team list",
+    };
+  }
+}
+
+export async function requestSportSync(): Promise<ActionResult> {
+  repo.enqueueJob("sync_sports");
+  refreshAllViews();
+  return { ok: true, message: "Queued a calendar refresh for every competition" };
+}
+
+export async function saveSportsSettings(config: SportsConfig): Promise<ActionResult> {
+  const parsed = sportsConfigSchema.safeParse(config);
+  if (!parsed.success) return { ok: false, message: "Those settings are not valid" };
+
+  saveSportsConfig(parsed.data);
+  repo.enqueueJob("sync_sports");
+  refreshAllViews();
+
+  const check = await checkDownloadDir(parsed.data.downloadDir);
+  return {
+    ok: true,
+    message: check.ok
+      ? `Saved. Downloads go to ${check.resolved}`
+      : `Saved, but the folder is not usable: ${check.message}`,
+  };
 }
 
 /* ------------------------------------------------------------------ */

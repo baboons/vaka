@@ -20,6 +20,7 @@ import {
   refreshAll,
   refreshMedia,
   searchForMedia,
+  syncSportEvents,
 } from "../lib/core/engine";
 import { describeScan, scanAll } from "../lib/core/import-runner";
 import { syncPlexSafely } from "../lib/core/plex";
@@ -63,6 +64,7 @@ let nextHeartbeatAt = 0;
 let nextMaintenanceAt = 0;
 let nextPlexSyncAt = 0;
 let nextImportAt = 0;
+let nextSportSyncAt = 0;
 
 async function runPoll(reason: string): Promise<void> {
   const db = getDb();
@@ -93,6 +95,59 @@ async function runPoll(reason: string): Promise<void> {
   }
 
   saveWorkerState({ lastPollAt: new Date().toISOString(), lastError: null }, db);
+}
+
+/**
+ * Refresh every followed competition's calendar.
+ *
+ * Fixtures move, cards get added to, and a bounded window means new events
+ * keep arriving at the far end of it — so this runs on its own schedule
+ * rather than only when something is followed.
+ */
+async function syncSports(): Promise<string> {
+  const db = getDb();
+  const competitions = repo.listMedia({ kind: "sport", monitoredOnly: true }, db);
+  if (!competitions.length) return "no competitions followed";
+
+  let added = 0;
+  let failed = 0;
+
+  for (const competition of competitions) {
+    try {
+      const summary = await syncSportEvents(competition, db);
+      added += summary.inserted;
+      if (summary.inserted > 0) {
+        log(
+          "info",
+          `${competition.title}: ${summary.inserted} new event${
+            summary.inserted === 1 ? "" : "s"
+          }`,
+        );
+      }
+    } catch (error) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      log("error", `${competition.title}: calendar refresh failed: ${message}`);
+      repo.addHistory(
+        {
+          mediaId: competition.id,
+          event: "error",
+          title: competition.title,
+          reason: `calendar refresh failed: ${message}`,
+        },
+        db,
+      );
+    }
+  }
+
+  // New events may already have releases sitting in the feed cache.
+  if (added > 0) {
+    for (const competition of competitions) {
+      repo.enqueueJob("search_media", { mediaId: competition.id }, db);
+    }
+  }
+
+  return `${added} new event(s) across ${competitions.length} competition(s), ${failed} failed`;
 }
 
 async function runJob(job: Job): Promise<string> {
@@ -142,6 +197,11 @@ async function runJob(job: Job): Promise<string> {
       if (!result.ok) throw new Error(result.message);
       log("ok", `plex: ${result.message}`);
       return result.message;
+    }
+    case "sync_sports": {
+      const message = await syncSports();
+      log("info", `sports: ${message}`);
+      return message;
     }
     case "import_scan": {
       const summary = await scanAll(db);
@@ -218,6 +278,18 @@ async function tick(): Promise<void> {
       }
     }
     nextRefreshAt = now + interval;
+  }
+
+  // Calendars are refreshed before the feed poll for the same reason as the
+  // Plex sync: an event has to exist before a release can be matched to it.
+  if (now >= nextSportSyncAt) {
+    nextSportSyncAt = now + config.sports.syncIntervalHours * 3_600_000;
+    try {
+      const message = await syncSports();
+      log("info", `sports: ${message}`);
+    } catch (error) {
+      log("error", `sports: calendar refresh failed: ${String(error)}`);
+    }
   }
 
   // Importing runs on its own, faster cadence: a download finishing has

@@ -7,7 +7,15 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { MediaKind } from "@/lib/core/types";
+import { KIND_LABELS, MEDIA_KINDS, type MediaKind } from "@/lib/core/types";
+
+const PLACEHOLDERS: Record<MediaKind, string> = {
+  tv: "Search for a TV show…",
+  movie: "Search for a movie…",
+  // Competitions are a fixed catalogue, so this narrows a list rather than
+  // querying anything.
+  sport: "Filter competitions…",
+};
 
 /**
  * Search box for the add page. Keeps the query in the URL so results survive a
@@ -37,7 +45,7 @@ export function SearchForm({
   return (
     <div className="space-y-3">
       <div className="inline-flex rounded-sm border border-border bg-secondary/40 p-0.5">
-        {(["tv", "movie"] as const).map((option) => (
+        {MEDIA_KINDS.map((option) => (
           <button
             key={option}
             type="button"
@@ -49,7 +57,7 @@ export function SearchForm({
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {option === "tv" ? "TV shows" : "Movies"}
+            {KIND_LABELS[option]}
           </button>
         ))}
       </div>
@@ -67,13 +75,12 @@ export function SearchForm({
             autoFocus
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder={
-              kind === "tv" ? "Search for a TV show…" : "Search for a movie…"
-            }
+            placeholder={PLACEHOLDERS[kind]}
             className="h-11 pl-9 text-[14px]"
           />
         </div>
-        <Button type="submit" size="lg" disabled={pending || !value.trim()}>
+        {/* Sports browse rather than search, so an empty box is a valid ask. */}
+        <Button type="submit" size="lg" disabled={pending || (!value.trim() && kind !== "sport")}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           Search
         </Button>

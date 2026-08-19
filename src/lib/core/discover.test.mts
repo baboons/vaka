@@ -32,6 +32,7 @@ function media(overrides: Partial<Media>): Media {
     quality: DEFAULT_TV_PROFILE,
     searchTerms: [],
     folder: null,
+    sport: null,
     state: "wanted",
     grabbedQuality: null,
     grabbedAt: null,

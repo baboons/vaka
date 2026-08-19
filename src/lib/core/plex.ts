@@ -343,7 +343,9 @@ export async function syncPlex(
 
   if (!library.length) return summary;
 
-  const index = buildIndex(library);
+  // Competitions are excluded: Plex has no notion of a followed league, and
+  // leaving one in the index would let it shadow a show of the same name.
+  const index = buildIndex(library.filter((media) => media.kind !== "sport"));
   const wantsMovies = library.some((media) => media.kind === "movie");
   const wantsShows = library.some((media) => media.kind === "tv");
 

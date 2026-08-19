@@ -5,19 +5,19 @@
 <h1 align="center">tvarr</h1>
 
 <p align="center">
-  Follow TV shows and movies, watch your torrent RSS feeds, and automatically
-  download the qualities you asked for.
+  Follow TV shows, movies and sport, watch your torrent RSS feeds, and
+  automatically download the qualities you asked for.
 </p>
 
-Search for a show or a film, pick the quality you want, and a background
-watcher polls your RSS feeds. When a release matching one of your titles turns
-up, it downloads the `.torrent` file into a folder of your choosing — where
-your torrent client picks it up.
+Search for a show, a film or a competition, pick the quality you want, and a
+background watcher polls your RSS feeds. When a release matching one of your
+titles turns up, it downloads the `.torrent` file into a folder of your
+choosing — where your torrent client picks it up.
 
-TV and movies are configured independently: separate download folders and
-separate quality profiles, because wanting 4K films but 1080p episodes is the
-normal case. Point it at a Plex server and anything you already own is crossed
-off automatically.
+TV, movies and sport are configured independently: separate download folders
+and separate quality profiles, because wanting 4K films but 1080p episodes is
+the normal case. Point it at a Plex server and anything you already own is
+crossed off automatically.
 
 ## How it works
 
@@ -54,10 +54,11 @@ Then:
 
 1. **Settings → Feeds** — add your tracker's RSS URL. Use *Test without saving*
    to confirm tvarr can read it before committing.
-2. **Settings → TV** and **Settings → Movies** — set each download folder and
-   the default quality. Point your torrent client's watch folder at the same
-   paths.
-3. **Add** — search for a show or film, choose the quality, follow it.
+2. **Settings → TV**, **→ Movies** and **→ Sports** — set each download folder
+   and the default quality. Point your torrent client's watch folder at the
+   same paths.
+3. **Add** — search for a show or film, or browse the sports catalogue, choose
+   the quality, follow it.
 
 Newly followed titles are immediately checked against releases already cached
 from your feeds, so you do not have to wait for the next poll.
@@ -175,6 +176,61 @@ Lists are cached (6 hours for popular, 12 for upcoming), so the dashboard's
 auto-refresh costs nothing. If a provider is unreachable the last good list is
 shown and marked as cached rather than disappearing.
 
+## Sports
+
+Sport is a third library alongside TV and movies. You follow a **competition**
+rather than a title — UFC, the Premier League, the NHL, Formula 1 — and tvarr
+pulls its calendar from ESPN's public schedule, then watches your feeds for
+each event.
+
+For a league you almost always want to pick **teams**. A Premier League season
+is 380 fixtures and an NHL season is over 1,300; the filter is applied when the
+calendar is fetched, so only the fixtures you care about are ever stored.
+
+You also choose which **parts of an event** to accept — main card, prelims,
+early prelims, race, qualifying, practice — because a single fight night is
+posted five or six times over, and the highlight reel is not the fight.
+
+### Matching, and why it asks
+
+A TV release carries `S03E01`, which identifies exactly one episode. A sports
+release carries no such thing. It might give the date and not the teams, or the
+teams and not the date, or a number that means everything (`UFC 330`) beside
+one that means nothing (`UFC Fight Night 245`).
+
+So tvarr scores each release against the calendar instead of judging it, and
+uses two thresholds:
+
+| | |
+|---|---|
+| **Confident** | Downloaded straight away. |
+| **Probable** | Listed under the competition's **Releases** tab, with the score and what it was made of, for you to grab in one click. |
+| **Below that** | Not treated as a match at all. |
+
+Some evidence is a flat refusal rather than a low score: a different event
+number, or a date more than two days out. `UFC 330` is never filed as `UFC 331`.
+
+The scoring accounts for the things that trip this up in practice — a night
+game that rolls past midnight UTC is one day out, not a mismatch; a race
+weekend is tagged with any of its three days; "Australian" and "Australia" are
+the same place.
+
+Switch on **Download uncertain matches too** on a competition if you would
+rather have the best guess than be asked. It is off by default: downloading the
+wrong game is a worse outcome than downloading nothing.
+
+### What gets filed where
+
+Events are grouped by competition and then by year:
+
+```
+/media/Sports/UFC/2026/UFC - 2026-08-15 - UFC 330 Makhachev vs Machado Garry.mkv
+```
+
+Plex reads sports best as a personal-media or *Other Videos* library; the
+naming templates under **Settings → Sports** work the same way as the TV and
+movie ones, with an extra `{airDate}` token.
+
 ## Feeds
 
 Standard RSS 2.0 and Torznab-style feeds both work. tvarr reads the download
@@ -182,9 +238,9 @@ link from `<link>`, `<enclosure>` or a magnet URI, and picks up size and seeder
 counts from `torznab:attr` elements, a `<torrent>` block, or plain tags when
 they are present.
 
-Each feed can be restricted to **TV only** or **movies only**. That prevents a
-film matching a show of the same name — worth doing when you follow both
-*Fargo* the series and *Fargo* the film.
+Each feed can be restricted to **TV only**, **movies only** or **sports only**.
+That prevents a film matching a show of the same name — worth doing when you
+follow both *Fargo* the series and *Fargo* the film.
 
 If a feed offers only a magnet link, tvarr writes a `.magnet` file containing
 the URI. Not every client watches for those; you can turn this off in
@@ -396,6 +452,7 @@ ignored silently.
   episode lists and air dates.
 - **Movies** come from Cinemeta, an IMDb-backed catalogue that needs no
   credentials. Add a TMDB API key in **Settings → General** for richer data.
+- **Sport** schedules come from ESPN's public site API — no key, no account.
 
 ## Commands
 
@@ -424,6 +481,10 @@ feed and asserts the right `.torrent` files land in the right folders.
   stray copy cannot double-grab. Use `pnpm watch --force` to override.
 - Anime absolute numbering (`Show - 137`) is not matched; season/episode,
   `1x02`, date-based daily shows and multi-episode files are.
+- Sport is limited to the competitions in the catalogue. Following one tvarr
+  cannot read the release names of would mean matching nothing, so the list is
+  fixed rather than open-ended. MotoGP is missing because ESPN does not
+  publish it.
 - There is no authentication. Keep it on your LAN or put it behind something
   that does auth before exposing it to the internet.
 - **Opening the dev server from another machine** (`http://10.0.1.2:4000`)

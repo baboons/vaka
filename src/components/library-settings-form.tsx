@@ -12,9 +12,27 @@ import { Label } from "@/components/ui/label";
 import type { KindConfig } from "@/lib/core/settings";
 import type { MediaKind } from "@/lib/core/types";
 
+const NOUNS: Record<MediaKind, string> = {
+  tv: "episodes",
+  movie: "movies",
+  sport: "events",
+};
+
+const NEW_NOUNS: Record<MediaKind, string> = {
+  tv: "shows",
+  movie: "movies",
+  sport: "competitions",
+};
+
+const SAVE_LABELS: Record<MediaKind, string> = {
+  tv: "TV",
+  movie: "movie",
+  sport: "sports",
+};
+
 /**
- * Per-library configuration. TV and movies each get their own copy of this,
- * which is the point — different folders and different quality targets.
+ * Per-library configuration. TV, movies and sports each get their own copy of
+ * this, which is the point — different folders and different quality targets.
  */
 export function LibrarySettingsForm({
   kind,
@@ -27,7 +45,7 @@ export function LibrarySettingsForm({
   const [pending, startTransition] = useTransition();
   const [checking, startChecking] = useTransition();
 
-  const noun = kind === "tv" ? "episodes" : "movies";
+  const noun = NOUNS[kind];
 
   const save = () =>
     startTransition(async () => {
@@ -73,7 +91,7 @@ export function LibrarySettingsForm({
 
       <div>
         <div className="mb-3 flex items-center gap-3">
-          <h3 className="label-mono">Default quality for new {kind === "tv" ? "shows" : "movies"}</h3>
+          <h3 className="label-mono">Default quality for new {NEW_NOUNS[kind]}</h3>
           <div className="rule flex-1" />
         </div>
         <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
@@ -89,7 +107,7 @@ export function LibrarySettingsForm({
 
       <Button onClick={save} disabled={pending}>
         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-        Save {kind === "tv" ? "TV" : "movie"} settings
+        Save {SAVE_LABELS[kind]} settings
       </Button>
     </div>
   );
