@@ -86,7 +86,7 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
     startAnalysing(async () => {
       const result = await analyseLibrary(kind, libraryDir);
       setReport(result.report ?? null);
-      if (result.ok) toast.success("Read your library — see what tvarr found below");
+      if (result.ok) toast.success("Read your library — see what vaka found below");
       else toast.error(result.message);
     });
 
@@ -144,7 +144,7 @@ export function LibraryNamingForm({ kind, initial }: { kind: MediaKind; initial:
       {report && (
         <div className="rounded-sm border border-border bg-secondary/20 p-3.5">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <p className="label-mono">What tvarr found</p>
+            <p className="label-mono">What vaka found</p>
             {report.exists && <Pill tone="online">{report.titleCount} folders</Pill>}
             {report.seasonStyles.map((style) => (
               <Pill key={style.example} tone="info">

@@ -11,8 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { after, before } from "node:test";
 
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-cache-"));
-process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vaka-cache-"));
+process.env.VAKA_DATA_DIR = path.join(tempRoot, "data");
 
 const { getDb, closeDb, nowIso } = await import("./db");
 const { cached, clearCache, CACHE_VERSION } = await import("./cache");

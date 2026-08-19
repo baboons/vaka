@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Manages tvarr as a background service.
+ * Manages vaka as a background service.
  *
  *   node scripts/service.mjs install     write the unit files and (re)start
  *   node scripts/service.mjs restart     restart both processes
@@ -15,7 +15,7 @@
  * stops downloads and restarting one does not disturb the other.
  *
  * Per-user services (systemd user units on Linux, launchd LaunchAgents on
- * macOS) rather than system ones: tvarr writes into your home directory and
+ * macOS) rather than system ones: vaka writes into your home directory and
  * must run as you, not as root.
  */
 
@@ -35,9 +35,11 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
  * install (which `pnpm run update` does on every update) preserves them
  * instead of silently resetting a custom port or database location.
  */
-let dataDir = process.env.TVARR_DATA_DIR
-  ? path.resolve(process.env.TVARR_DATA_DIR)
-  : path.join(os.homedir(), ".tvarr");
+const configuredDataDir = process.env.VAKA_DATA_DIR ?? process.env.TVARR_DATA_DIR;
+
+let dataDir = configuredDataDir
+  ? path.resolve(configuredDataDir)
+  : path.join(os.homedir(), ".vaka");
 
 let port = process.env.PORT?.trim() || "4000";
 
@@ -52,27 +54,39 @@ const isLinux = process.platform === "linux";
 const SERVICES = [
   {
     key: "watcher",
-    unit: "tvarr-watcher",
-    label: "dev.tvarr.watcher",
+    unit: "vaka-watcher",
+    label: "dev.vaka.watcher",
     title: "Watcher",
-    description: "tvarr release watcher",
+    description: "vaka release watcher",
     exec: () => [nodeBin, tsxCli, watcherEntry],
-    env: () => ({ NO_COLOR: "1", TVARR_DATA_DIR: dataDir }),
+    env: () => ({ NO_COLOR: "1", VAKA_DATA_DIR: dataDir }),
   },
   {
     key: "web",
-    unit: "tvarr-web",
-    label: "dev.tvarr.web",
+    unit: "vaka-web",
+    label: "dev.vaka.web",
     title: "Web interface",
-    description: "tvarr web interface",
+    description: "vaka web interface",
     exec: () => [nodeBin, nextCli, "start"],
     env: () => ({
       NO_COLOR: "1",
-      TVARR_DATA_DIR: dataDir,
+      VAKA_DATA_DIR: dataDir,
       PORT: port,
       NODE_ENV: "production",
     }),
   },
+];
+
+/**
+ * Units from before the rename.
+ *
+ * They have to be retired explicitly. Left alone they would keep running the
+ * same code from the same checkout — two web servers fighting over the port,
+ * and two watchers racing to grab the same releases.
+ */
+const LEGACY_SERVICES = [
+  { key: "watcher", unit: "tvarr-watcher", label: "dev.tvarr.watcher" },
+  { key: "web", unit: "tvarr-web", label: "dev.tvarr.web" },
 ];
 
 function servicePath(service) {
@@ -114,12 +128,31 @@ function readUnitEnv(service) {
  */
 function adoptInstalledSettings() {
   const explicitPort = Boolean(process.env.PORT?.trim());
-  const explicitDataDir = Boolean(process.env.TVARR_DATA_DIR?.trim());
+  const explicitDataDir = Boolean(configuredDataDir?.trim());
   if (explicitPort && explicitDataDir) return;
 
-  const installed = { ...readUnitEnv(SERVICES[0]), ...readUnitEnv(SERVICES[1]) };
+  // Pre-rename units are read too, so a custom port or database location set
+  // before the rename survives the first install under the new name.
+  const installed = {
+    ...readUnitEnv(LEGACY_SERVICES[0]),
+    ...readUnitEnv(LEGACY_SERVICES[1]),
+    ...readUnitEnv(SERVICES[0]),
+    ...readUnitEnv(SERVICES[1]),
+  };
+
   if (!explicitPort && installed.PORT) port = installed.PORT;
-  if (!explicitDataDir && installed.TVARR_DATA_DIR) dataDir = installed.TVARR_DATA_DIR;
+  if (explicitDataDir) return;
+
+  // A pre-rename unit holding the *old default* was never a choice anyone
+  // made — it is just where the old version put things. Leave it to the app
+  // to move that folder to the new default. A path someone actually picked is
+  // kept exactly as it is.
+  const legacyDefault = path.join(os.homedir(), ".tvarr");
+  const installedDataDir = installed.VAKA_DATA_DIR ?? installed.TVARR_DATA_DIR;
+
+  if (installedDataDir && path.resolve(installedDataDir) !== legacyDefault) {
+    dataDir = installedDataDir;
+  }
 }
 
 adoptInstalledSettings();
@@ -152,8 +185,27 @@ function requireSupportedPlatform() {
   }
 }
 
+/**
+ * Whether any unit is installed, under either name.
+ *
+ * Units from before the rename count. Without that, the first update on a
+ * machine installed as tvarr would build the new code, report that nothing is
+ * installed, and leave the old units running the old code indefinitely.
+ */
+/**
+ * Which units are on disk, under each name. Used by `pnpm run doctor` to say
+ * whether anything is still installed under the pre-rename name.
+ */
+export function installedUnits() {
+  const names = (list) =>
+    list.filter((service) => fs.existsSync(servicePath(service))).map((s) => s.unit);
+  return { current: names(SERVICES), legacy: names(LEGACY_SERVICES) };
+}
+
 export function isInstalled() {
-  return SERVICES.some((service) => fs.existsSync(servicePath(service)));
+  return [...SERVICES, ...LEGACY_SERVICES].some((service) =>
+    fs.existsSync(servicePath(service)),
+  );
 }
 
 /** Where the database lives, honouring anything baked into an installed unit. */
@@ -268,6 +320,8 @@ function install() {
     run("systemctl", ["--user", "daemon-reload"]);
   }
 
+  removeLegacyServices();
+
   const failed = SERVICES.filter((service) => !installOne(service));
   if (failed.length) {
     fail(
@@ -277,7 +331,7 @@ function install() {
   }
 
   console.log(`
-  tvarr is installed and running.
+  vaka is installed and running.
 
     Web interface   http://localhost:${port}
     Watcher         downloading in the background
@@ -295,8 +349,33 @@ function install() {
 `);
 }
 
+/** Stop and delete any unit left over from before the rename. */
+function removeLegacyServices() {
+  let removed = 0;
+
+  for (const service of LEGACY_SERVICES) {
+    const file = servicePath(service);
+    if (!fs.existsSync(file)) continue;
+
+    if (isMac) {
+      run("launchctl", ["bootout", `gui/${process.getuid()}/${service.label}`], { quiet: true });
+    } else {
+      run("systemctl", ["--user", "disable", "--now", service.unit], { quiet: true });
+    }
+    fs.rmSync(file, { force: true });
+    removed += 1;
+  }
+
+  if (removed) {
+    if (isLinux) run("systemctl", ["--user", "daemon-reload"], { quiet: true });
+    console.log(`  retired ${removed} service(s) installed under the old name`);
+  }
+}
+
 function uninstall() {
   requireSupportedPlatform();
+
+  removeLegacyServices();
 
   for (const service of SERVICES) {
     if (isMac) {
@@ -308,7 +387,7 @@ function uninstall() {
   }
 
   if (isLinux) run("systemctl", ["--user", "daemon-reload"], { quiet: true });
-  console.log("\n  Removed the tvarr services.\n");
+  console.log("\n  Removed the vaka services.\n");
 }
 
 function start() {
@@ -319,7 +398,7 @@ function start() {
     if (isMac) run("launchctl", ["bootstrap", `gui/${process.getuid()}`, servicePath(service)]);
     else run("systemctl", ["--user", "start", service.unit]);
   }
-  console.log("\n  tvarr started.\n");
+  console.log("\n  vaka started.\n");
 }
 
 function stop() {
@@ -329,7 +408,7 @@ function stop() {
     if (isMac) run("launchctl", ["bootout", `gui/${process.getuid()}/${service.label}`], { quiet: true });
     else run("systemctl", ["--user", "stop", service.unit], { quiet: true });
   }
-  console.log("\n  tvarr stopped.\n");
+  console.log("\n  vaka stopped.\n");
 }
 
 export function restart({ silent = false } = {}) {
@@ -354,13 +433,13 @@ export function restart({ silent = false } = {}) {
     if (!restarted) ok = false;
   }
 
-  if (!silent) console.log(ok ? "\n  tvarr restarted.\n" : "\n  Could not restart every service.\n");
+  if (!silent) console.log(ok ? "\n  vaka restarted.\n" : "\n  Could not restart every service.\n");
   return ok;
 }
 
 /** Reads the heartbeat the watcher writes into the database. */
 function readHeartbeat() {
-  const dbPath = path.join(dataDir, "tvarr.db");
+  const dbPath = path.join(dataDir, "vaka.db");
   if (!fs.existsSync(dbPath)) return null;
   try {
     // Loaded lazily: status should still work if deps are mid-install.

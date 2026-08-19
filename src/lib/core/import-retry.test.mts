@@ -2,7 +2,7 @@
  * Regressions from a real setup where nothing got filed.
  *
  * Every case here was reported by a user whose downloads sat in the completed
- * folder while tvarr recorded a reason and never looked again.
+ * folder while vaka recorded a reason and never looked again.
  */
 
 import assert from "node:assert/strict";
@@ -11,8 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { after, before } from "node:test";
 
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-retry-"));
-process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vaka-retry-"));
+process.env.VAKA_DATA_DIR = path.join(tempRoot, "data");
 
 const { getDb, closeDb } = await import("./db");
 const repo = await import("./repo");
@@ -29,7 +29,7 @@ after(async () => {
 test("a config saved before naming existed still names TV episodes correctly", () => {
   const db = getDb();
 
-  // Exactly what an older tvarr wrote: no template fields at all.
+  // Exactly what an older vaka wrote: no template fields at all.
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('tv', ?)").run(
     JSON.stringify({
       downloadDir: "/data/watch",
@@ -110,7 +110,7 @@ test("an adopted back-catalogue download is left alone for good", () => {
       sourceKey: key,
       name: "Moonwalker.1988.1080p.BluRay.x264-OFT",
       status: "adopted",
-      detail: "already complete when tvarr was connected",
+      detail: "already complete when vaka was connected",
     },
     db,
   );

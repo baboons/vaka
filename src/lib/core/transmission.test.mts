@@ -13,8 +13,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { after, before } from "node:test";
 
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-tm-"));
-process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vaka-tm-"));
+process.env.VAKA_DATA_DIR = path.join(tempRoot, "data");
 
 const transmission = await import("./transmission");
 const { inspectLibrary } = await import("./inspect-library");

@@ -69,7 +69,7 @@ export function LibrarySettingsForm({
           <Input
             value={config.downloadDir}
             onChange={(event) => setConfig({ ...config, downloadDir: event.target.value })}
-            placeholder="~/Downloads/tvarr"
+            placeholder="~/Downloads/vaka"
             className="mono text-[12.5px]"
           />
           <Button variant="secondary" onClick={verify} disabled={checking}>

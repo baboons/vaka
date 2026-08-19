@@ -1,7 +1,7 @@
 /**
  * Importing finished downloads into a Plex-shaped library.
  *
- * This is the only code in tvarr that touches files the user already had, so
+ * This is the only code in vaka that touches files the user already had, so
  * the safety properties matter as much as the happy path: never overwrite,
  * never destroy the source when hardlinking, never write outside the library.
  */
@@ -12,8 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { after, before, beforeEach } from "node:test";
 
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-import-"));
-process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vaka-import-"));
+process.env.VAKA_DATA_DIR = path.join(tempRoot, "data");
 
 const { getDb, closeDb } = await import("./db");
 const { importPath, planImport, runImport } = await import("./import");
@@ -282,9 +282,9 @@ test("move mode relocates the file instead of linking it", async () => {
   await assert.rejects(() => fs.stat(source), "the source should be gone after a move");
 });
 
-test("recognises a download tvarr grabbed itself, however it is punctuated", () => {
+test("recognises a download vaka grabbed itself, however it is punctuated", () => {
   // Adoption of a torrent client's existing downloads must never swallow
-  // something tvarr asked for: that silently loses the episode forever.
+  // something vaka asked for: that silently loses the episode forever.
   const db = getDb();
   repo.addHistory(
     {
@@ -295,7 +295,7 @@ test("recognises a download tvarr grabbed itself, however it is punctuated", () 
   );
 
   assert.equal(
-    repo.wasGrabbedByTvarr(
+    repo.wasGrabbedByVaka(
       "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB",
       db,
     ),
@@ -305,7 +305,7 @@ test("recognises a download tvarr grabbed itself, however it is punctuated", () 
 
   // Transmission names a single-file torrent after the file, extension and all.
   assert.equal(
-    repo.wasGrabbedByTvarr(
+    repo.wasGrabbedByVaka(
       "Ted.Lasso.S04E02.Curiouser.and.Curiouser.1080p.ATVP.WEB-DL.DDP5.1.Atmos.H.264-playWEB.mkv",
       db,
     ),
@@ -315,7 +315,7 @@ test("recognises a download tvarr grabbed itself, however it is punctuated", () 
 
   // Some trackers hand out spaces where the feed had dots.
   assert.equal(
-    repo.wasGrabbedByTvarr(
+    repo.wasGrabbedByVaka(
       "Ted Lasso S04E02 Curiouser and Curiouser 1080p ATVP WEB-DL DDP5 1 Atmos H 264-playWEB",
       db,
     ),
@@ -323,8 +323,8 @@ test("recognises a download tvarr grabbed itself, however it is punctuated", () 
     "separators must not hide the match",
   );
 
-  assert.equal(repo.wasGrabbedByTvarr("Moonwalker.1988.1080p.BluRay.x264-OFT", db), false);
-  assert.equal(repo.wasGrabbedByTvarr("", db), false);
+  assert.equal(repo.wasGrabbedByVaka("Moonwalker.1988.1080p.BluRay.x264-OFT", db), false);
+  assert.equal(repo.wasGrabbedByVaka("", db), false);
 });
 
 test("cleanup refuses to retire a torrent whose library copy has vanished", async () => {

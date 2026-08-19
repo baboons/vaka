@@ -7,10 +7,10 @@ import type { NextConfig } from "next";
  *
  * Next only trusts localhost by default, so opening the dev server from
  * another machine on the LAN returns 403 for every chunk and the HMR
- * websocket fails. tvarr is normally run on a home server and opened from a
+ * websocket fails. vaka is normally run on a home server and opened from a
  * laptop, so this machine's own LAN addresses are allowlisted automatically.
  *
- * Add hostnames (e.g. "tvarr.local") with TVARR_DEV_ORIGINS, comma separated.
+ * Add hostnames (e.g. "vaka.local") with VAKA_DEV_ORIGINS, comma separated.
  */
 function devOrigins(): string[] {
   const addresses = Object.values(os.networkInterfaces())
@@ -18,7 +18,7 @@ function devOrigins(): string[] {
     .filter((iface) => iface && iface.family === "IPv4" && !iface.internal)
     .map((iface) => iface!.address);
 
-  const configured = (process.env.TVARR_DEV_ORIGINS ?? "")
+  const configured = (process.env.VAKA_DEV_ORIGINS ?? process.env.TVARR_DEV_ORIGINS ?? "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);

@@ -25,7 +25,7 @@ export interface SportChoices {
 
 /**
  * The three things that define how a competition is followed: who, what, and
- * how sure tvarr has to be before it downloads anything.
+ * how sure vaka has to be before it downloads anything.
  *
  * Shared between following a competition for the first time and changing it
  * afterwards, because they are the same decision.
@@ -85,7 +85,7 @@ export function SportOptions({
         <span className="min-w-0">
           <span className="block text-[13px] font-medium">Download uncertain matches too</span>
           <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
-            Sports releases carry no episode number, so tvarr scores how well a release matches
+            Sports releases carry no episode number, so vaka scores how well a release matches
             an event. With this off, anything short of a confident match waits under Releases
             for you to confirm it. With it on, the best guess is downloaded.
           </span>

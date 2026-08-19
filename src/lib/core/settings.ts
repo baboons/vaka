@@ -102,7 +102,7 @@ const generalConfigSchema = z.object({
 /**
  * Optional Plex server, used to cross off anything you already have.
  *
- * Read-only: tvarr never writes to Plex, it only asks what is on the shelves.
+ * Read-only: vaka never writes to Plex, it only asks what is on the shelves.
  */
 const plexConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -147,14 +147,14 @@ const importConfigSchema = z.object({
   cleanupRequireBoth: z.boolean().default(false),
 });
 
-/** Transmission's RPC endpoint, so tvarr knows when a download finished. */
+/** Transmission's RPC endpoint, so vaka knows when a download finished. */
 const transmissionConfigSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default("http://localhost:9091/transmission/rpc"),
   username: z.string().default(""),
   password: z.string().default(""),
   /**
-   * Transmission reports paths as its own process sees them. When tvarr runs
+   * Transmission reports paths as its own process sees them. When vaka runs
    * elsewhere (a container, another host), rewrite that prefix to the local
    * one — e.g. "/downloads" -> "/mnt/nas/downloads".
    */
@@ -188,7 +188,7 @@ const DOWNLOAD_FOLDER: Record<MediaKind, string> = {
 };
 
 function defaultDownloadDir(kind: MediaKind): string {
-  return path.join(os.homedir(), "Downloads", "tvarr", DOWNLOAD_FOLDER[kind]);
+  return path.join(os.homedir(), "Downloads", "vaka", DOWNLOAD_FOLDER[kind]);
 }
 
 /** The standard Plex layout, until a library scan proposes something else. */

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The tvarr mark: the app's own live-signal indicator — a dark core inside a
+ * The vaka mark: the app's own live-signal indicator — a dark core inside a
  * broken scanner ring, on a signal-amber tile.
  *
  * Kept in sync with `public/logo.svg` and `src/app/icon.svg` (the favicon).
@@ -12,17 +12,17 @@ export function LogoMark({ className }: { className?: string }) {
       viewBox="0 0 64 64"
       className={cn("size-6", className)}
       role="img"
-      aria-label="tvarr"
+      aria-label="vaka"
     >
       <defs>
-        <linearGradient id="tvarr-tile" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="vaka-tile" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#FFC65B" />
           <stop offset="0.55" stopColor="#F5A524" />
           <stop offset="1" stopColor="#E8930C" />
         </linearGradient>
       </defs>
 
-      <rect width="64" height="64" rx="15" fill="url(#tvarr-tile)" />
+      <rect width="64" height="64" rx="15" fill="url(#vaka-tile)" />
       <path
         d="M15 1.5h34"
         stroke="#FFFFFF"

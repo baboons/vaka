@@ -178,7 +178,7 @@ export async function fetchFeed(url: string, feedId: number): Promise<FetchFeedR
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: {
       accept: "application/rss+xml, application/xml, text/xml, */*",
-      "user-agent": "tvarr/1.0",
+      "user-agent": "vaka/1.0",
     },
     redirect: "follow",
   });

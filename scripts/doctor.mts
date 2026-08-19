@@ -7,12 +7,17 @@
  *   pnpm run doctor --now           run an import scan immediately
  *
  * Read-only unless --retry or --now is given.
+ *
+ * The rename check runs first and on purpose: opening the database is what
+ * moves pre-rename data, so anything reported after that has already happened.
  */
 
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { dataDir, expandHome, getDb } from "../src/lib/core/db";
+import { installedUnits } from "./service.mjs";
+
+import { dataDir, expandHome, getDb, inspectDataMigration } from "../src/lib/core/db";
 import { planImport } from "../src/lib/core/import";
 import { describeScan, scanAll } from "../src/lib/core/import-runner";
 import * as repo from "../src/lib/core/repo";
@@ -30,12 +35,81 @@ const WARN = "\u001b[33m!\u001b[0m";
 const DIM = "\u001b[90m";
 const RESET = "\u001b[0m";
 
-const db = getDb();
-const config = getConfig(db);
-
 function heading(text: string) {
   console.log(`\n\u001b[1m${text}\u001b[0m`);
 }
+
+/* ------------------------------------------------------------------ */
+/* Rename — reported before anything opens the database                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Report anything still carrying the old name — and stay quiet when nothing
+ * does. This is a one-time migration, so a permanent "nothing to do" section
+ * would be clutter for everyone who never ran the app as tvarr. The data
+ * directory is printed under Configuration either way.
+ */
+function reportRename(): void {
+  const data = inspectDataMigration();
+  const units = installedUnits();
+  const todo: string[] = [];
+
+  const clean =
+    !data.movingFrom &&
+    !data.renamingIn &&
+    !data.strandedDir &&
+    !data.legacyEnv.length &&
+    !units.legacy.length;
+
+  if (clean) return;
+
+  heading("Rename");
+
+  if (data.movingFrom) {
+    console.log(`  Data          ${WARN} ${data.movingFrom} will move to ${data.current}`);
+    todo.push("Start vaka (or run this again) to move the folder.");
+  } else if (data.renamingIn) {
+    console.log(`  Data          ${WARN} tvarr.db in ${data.renamingIn} will be renamed to vaka.db`);
+    todo.push("Start vaka (or run this again) to rename the database.");
+  } else {
+    console.log(`  Data          ${OK} ${data.current}`);
+  }
+
+  if (data.strandedDir) {
+    console.log(
+      `  Old folder    ${WARN} ${data.strandedDir} still holds a tvarr.db and is not in use`,
+    );
+    todo.push(`Nothing reads ${data.strandedDir} any more — delete it once you are satisfied.`);
+  }
+
+  if (data.legacyEnv.length) {
+    console.log(`  Environment   ${WARN} ${data.legacyEnv.join(", ")} set`);
+    todo.push(
+      `Rename ${data.legacyEnv.join(" and ")} to ${data.legacyEnv
+        .map((name) => name.replace("TVARR", "VAKA"))
+        .join(" and ")}. The old names still work for now.`,
+    );
+  }
+
+  if (units.legacy.length) {
+    console.log(`  Services      ${WARN} installed under the old name: ${units.legacy.join(", ")}`);
+    todo.push("Run `pnpm run service:install` to replace them (it retires the old ones).");
+  } else if (units.current.length) {
+    console.log(`  Services      ${OK} ${units.current.join(", ")}`);
+  } else {
+    console.log(`  Services      ${DIM}none installed${RESET}`);
+  }
+
+  console.log("");
+  for (const item of todo) console.log(`  ${WARN} ${item}`);
+}
+
+reportRename();
+
+// Everything below needs the database, and opening it performs the move
+// reported above.
+const db = getDb();
+const config = getConfig(db);
 
 async function folderState(dir: string): Promise<string> {
   if (!dir.trim()) return `${BAD} not set`;
@@ -186,7 +260,7 @@ for (const candidate of candidates) {
     await fs.access(candidate.source);
   } catch {
     console.log(`  ${BAD} ${short}`);
-    console.log(`      tvarr cannot see ${candidate.source}`);
+    console.log(`      vaka cannot see ${candidate.source}`);
     console.log(`      ${DIM}set a path mapping under Settings → Import → Transmission${RESET}`);
     continue;
   }

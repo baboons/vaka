@@ -54,7 +54,7 @@ export function SportsSettingsForm({ initial }: { initial: SportsConfig }) {
           <Input
             value={config.downloadDir}
             onChange={(event) => setConfig({ ...config, downloadDir: event.target.value })}
-            placeholder="~/Downloads/tvarr/sports"
+            placeholder="~/Downloads/vaka/sports"
             className="mono text-[12.5px]"
           />
           <Button variant="secondary" onClick={verify} disabled={checking}>

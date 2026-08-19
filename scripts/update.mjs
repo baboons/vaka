@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Updates tvarr in place and restarts it.
+ * Updates vaka in place and restarts it.
  *
  *   node scripts/update.mjs              pull, install, build, restart
  *   node scripts/update.mjs --no-build   skip the web build (watcher-only hosts)
@@ -13,6 +13,7 @@
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -112,7 +113,7 @@ if (!skipBuild) {
   if (!run("pnpm", ["build"]).ok) {
     // Deliberately left running: old code serving is better than nothing
     // serving, and the operator can retry once the build is fixed.
-    fail("The build failed. tvarr was left running on the old code.");
+    fail("The build failed. vaka was left running on the old code.");
   }
 }
 
@@ -124,9 +125,17 @@ try {
   const { createRequire } = await import("node:module");
   const require = createRequire(import.meta.url);
   const Database = require("better-sqlite3");
-  const dbPath = path.join(resolvedDataDir(), "tvarr.db");
+  // Both names are checked: on the first update after the rename the data
+  // directory has not been adopted yet, because that happens when the app
+  // next opens the database.
+  const dataDir = resolvedDataDir();
+  const dbPath = [
+    path.join(dataDir, "vaka.db"),
+    path.join(dataDir, "tvarr.db"),
+    path.join(os.homedir(), ".tvarr", "tvarr.db"),
+  ].find((candidate) => fs.existsSync(candidate));
 
-  if (fs.existsSync(dbPath)) {
+  if (dbPath) {
     const db = new Database(dbPath);
     const cleared = db.prepare("DELETE FROM cache").run().changes;
     db.close();
@@ -157,5 +166,5 @@ if (isInstalled()) {
 }
 
 console.log(`
-  tvarr is up to date at ${after.slice(0, 8)}.
+  vaka is up to date at ${after.slice(0, 8)}.
 `);

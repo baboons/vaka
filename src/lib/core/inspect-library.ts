@@ -1,7 +1,7 @@
 /**
  * Reading an existing library and working out the convention it already uses.
  *
- * Imposing tvarr's defaults on a library someone has curated for years is the
+ * Imposing vaka's defaults on a library someone has curated for years is the
  * wrong default, so the settings screen scans what is there and proposes
  * templates that match it. The user still decides.
  */
@@ -55,7 +55,7 @@ export interface LibraryReport {
   seasonStyles: Array<{ example: string; count: number }>;
   /** Movies only: files sitting loose in the root rather than in a folder. */
   looseFiles: number;
-  /** What tvarr suggests based on the above. */
+  /** What vaka suggests based on the above. */
   proposed: NamingTemplates;
   /** Plain-English summary of what was found. */
   summary: string;
@@ -171,7 +171,7 @@ export async function inspectLibrary(
 
 function describe(report: LibraryReport): string {
   if (!report.titleCount && !report.looseFiles) {
-    return "The folder is empty, so tvarr will use the standard Plex layout.";
+    return "The folder is empty, so vaka will use the standard Plex layout.";
   }
 
   const parts: string[] = [];
@@ -185,14 +185,14 @@ function describe(report: LibraryReport): string {
     parts.push(
       report.withYear >= Math.ceil(report.titleCount / 2)
         ? "Most folders include the year, so new ones will too."
-        : "Folders here do not include the year, so tvarr will leave it out.",
+        : "Folders here do not include the year, so vaka will leave it out.",
     );
   }
 
   if (report.kind === "tv") {
     if (report.seasonStyles.length) {
       const [top] = report.seasonStyles;
-      parts.push(`Seasons are named like “${top.example}”, which is what tvarr will create.`);
+      parts.push(`Seasons are named like “${top.example}”, which is what vaka will create.`);
       if (report.seasonStyles.length > 1) {
         parts.push(
           `Other styles are also present (${report.seasonStyles
@@ -209,14 +209,14 @@ function describe(report: LibraryReport): string {
   if (report.kind === "sport") {
     if (report.seasonStyles.length) {
       const [top] = report.seasonStyles;
-      parts.push(`Events are grouped in folders like “${top.example}”, which tvarr will match.`);
+      parts.push(`Events are grouped in folders like “${top.example}”, which vaka will match.`);
     } else {
       parts.push("No year folders were found, so events will be grouped under one per year.");
     }
   }
 
   if (report.kind === "movie" && report.looseFiles > report.titleCount) {
-    parts.push("Films sit directly in the folder here, but tvarr always makes a folder per film — that is what Plex expects.");
+    parts.push("Films sit directly in the folder here, but vaka always makes a folder per film — that is what Plex expects.");
   }
 
   return parts.join(" ");

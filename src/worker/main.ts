@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The tvarr watcher.
+ * The vaka watcher.
  *
  * A long-running background process (launchd on macOS, systemd on Linux) that
  * polls the configured RSS feeds, matches new releases against the library and
@@ -364,7 +364,7 @@ async function main(): Promise<void> {
   const feeds = repo.listFeeds(true, db);
   const library = repo.listMedia({ monitoredOnly: true }, db);
 
-  log("ok", `tvarr watcher started (pid ${process.pid})`);
+  log("ok", `vaka watcher started (pid ${process.pid})`);
   log(
     "info",
     `${library.length} monitored title${library.length === 1 ? "" : "s"}, ` +

@@ -12,8 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { after, before } from "node:test";
 
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-sports-"));
-process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vaka-sports-"));
+process.env.VAKA_DATA_DIR = path.join(tempRoot, "data");
 
 const { getDb, closeDb } = await import("./db");
 const repo = await import("./repo");

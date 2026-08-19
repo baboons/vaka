@@ -11,8 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import test, { after, before } from "node:test";
 
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "tvarr-plex-"));
-process.env.TVARR_DATA_DIR = path.join(tempRoot, "data");
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vaka-plex-"));
+process.env.VAKA_DATA_DIR = path.join(tempRoot, "data");
 
 const { getDb, closeDb } = await import("./db");
 const plex = await import("./plex");
@@ -210,7 +210,7 @@ test("normalizes a bare host:port into a URL", () => {
 test("reports the server name and its movie and TV sections", async () => {
   const info = await plex.testConnection(settings.getConfig().plex);
   assert.equal(info.name, "Basement");
-  // The music section is not something tvarr can use.
+  // The music section is not something vaka can use.
   assert.deepEqual(
     info.sections.map((section) => section.type),
     ["movie", "show"],

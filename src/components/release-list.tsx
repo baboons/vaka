@@ -19,7 +19,7 @@ function formatSize(bytes: number | null): string | null {
  * whether the release was never seen, or seen and turned down.
  *
  * For a competition it does one more job: a sports release carries no episode
- * number, so anything tvarr could not identify with confidence is listed here
+ * number, so anything vaka could not identify with confidence is listed here
  * with its score and what that score was made of, for you to grab or ignore.
  */
 export function ReleaseList({

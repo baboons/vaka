@@ -1,7 +1,8 @@
 {
-  "name": "tvarr",
+  "name": "vaka",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "PORT=${PORT:-4000} next dev",
     "build": "next build",
@@ -53,5 +54,5 @@
     "typescript": "^5"
   },
   "packageManager": "pnpm@10.33.0",
-  "description": "Track TV shows and movies, watch your torrent RSS feeds, and auto-download what you want."
+  "description": "Track TV shows, movies and sport, watch your torrent RSS feeds, and auto-download what you want."
 }

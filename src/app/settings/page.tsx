@@ -32,7 +32,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Settings — tvarr" };
+export const metadata = { title: "Settings — vaka" };
 
 export default function SettingsPage() {
   const db = getDb();
@@ -127,7 +127,7 @@ export default function SettingsPage() {
             <TabsContent value="sports" className="space-y-5">
               <p className="text-[13px] leading-relaxed text-muted-foreground">
                 Competitions come from ESPN&rsquo;s public schedule — no key, no account. Because
-                sports releases carry no episode number, tvarr scores each one against the
+                sports releases carry no episode number, vaka scores each one against the
                 calendar and only downloads the matches it is sure about; the rest wait under a
                 competition&rsquo;s <span className="text-foreground/80">Releases</span> tab.
               </p>
@@ -145,7 +145,7 @@ export default function SettingsPage() {
 
             <TabsContent value="import">
               <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
-                tvarr can file finished downloads into your Plex library — renaming them, and
+                vaka can file finished downloads into your Plex library — renaming them, and
                 creating <span className="mono">Season 01</span> folders where they are missing.
                 Set the destination and naming under <span className="text-foreground/80">TV</span>,{" "}
                 <span className="text-foreground/80">Movies</span> and{" "}
@@ -162,7 +162,7 @@ export default function SettingsPage() {
 
             <TabsContent value="plex">
               <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
-                Point tvarr at a Plex server and it will cross off everything you already have,
+                Point vaka at a Plex server and it will cross off everything you already have,
                 so the watcher never downloads a second copy. Matching prefers IMDb, TVDB and
                 TMDB ids, falling back to title and year.
               </p>
@@ -251,7 +251,7 @@ function WatcherPanel({
           <p className="label-mono">Data directory</p>
           <p className="mono text-[12px] text-foreground/80">{dir}</p>
           <p className="text-[11.5px] leading-snug text-muted-foreground">
-            Holds <span className="mono">{path.basename(dir)}/tvarr.db</span> — your library,
+            Holds <span className="mono">{path.basename(dir)}/vaka.db</span> — your library,
             settings and history. Both the watcher and this interface read it, so they must run
             as the same user.
           </p>

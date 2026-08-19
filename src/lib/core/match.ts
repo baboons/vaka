@@ -240,7 +240,7 @@ export function isUpgrade(
   parsed: ParsedRelease,
 ): MatchDecision {
   if (!profile.upgrade) {
-    // Naming the quality covers both cases honestly: something tvarr grabbed,
+    // Naming the quality covers both cases honestly: something vaka grabbed,
     // and something that was simply already on the shelf (" · Plex").
     return {
       ok: false,

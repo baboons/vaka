@@ -1,7 +1,7 @@
 /**
  * Plex integration.
  *
- * Strictly read-only: tvarr asks a Plex server what is already on the shelves
+ * Strictly read-only: vaka asks a Plex server what is already on the shelves
  * and crosses those episodes and films off, so the watcher stops looking for
  * things you own. Nothing is ever written back to Plex.
  *
@@ -56,8 +56,8 @@ async function plexFetch<T>(
   const headers: Record<string, string> = {
     accept: "application/json",
     "X-Plex-Token": config.token.trim(),
-    "X-Plex-Client-Identifier": "tvarr",
-    "X-Plex-Product": "tvarr",
+    "X-Plex-Client-Identifier": "vaka",
+    "X-Plex-Product": "vaka",
   };
   if (options.range) {
     headers["X-Plex-Container-Start"] = String(options.range.start);
@@ -396,7 +396,7 @@ export async function syncPlex(
       summary.matchedTitles += 1;
 
       // One request per matched show beats pulling every episode in the
-      // section, since tvarr usually follows a handful of the shows there.
+      // section, since vaka usually follows a handful of the shows there.
       const episodes = await fetchAll(
         config.plex,
         `/library/metadata/${show.ratingKey}/allLeaves`,

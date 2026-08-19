@@ -14,11 +14,93 @@ import Database from "better-sqlite3";
 
 export type Db = Database.Database;
 
-/** Where the database and any runtime state live. Override for tests. */
+const DIR_NAME = ".vaka";
+const DB_FILE = "vaka.db";
+
+/* The app was called tvarr until it grew a sports library. */
+const LEGACY_DIR_NAME = ".tvarr";
+const LEGACY_DB_FILE = "tvarr.db";
+
+function defaultDataDir(): string {
+  return path.join(os.homedir(), DIR_NAME);
+}
+
+/**
+ * Where the database and any runtime state live. Override for tests.
+ *
+ * `TVARR_DATA_DIR` is still honoured: a service unit installed under the old
+ * name has it baked in, and it keeps working until the unit is reinstalled.
+ */
 export function dataDir(): string {
-  const configured = process.env.TVARR_DATA_DIR;
+  const configured = process.env.VAKA_DATA_DIR ?? process.env.TVARR_DATA_DIR;
   if (configured && configured.trim()) return path.resolve(expandHome(configured.trim()));
-  return path.join(os.homedir(), ".tvarr");
+  return defaultDataDir();
+}
+
+/**
+ * Rename a pre-rename database in place.
+ *
+ * The write-ahead log is folded in first. SQLite finds it by file name, so
+ * renaming the database and its `-wal` as two separate steps risks dropping
+ * whatever had not been checkpointed yet; closing the last connection after a
+ * truncating checkpoint removes both sidecar files, leaving one file to move.
+ *
+ * Throws rather than reporting, so a caller mid-way through moving a directory
+ * can stop before it has touched anything.
+ */
+function renameLegacyDb(dir: string): boolean {
+  if (fs.existsSync(path.join(dir, DB_FILE))) return false;
+  if (!fs.existsSync(path.join(dir, LEGACY_DB_FILE))) return false;
+
+  const handle = new Database(path.join(dir, LEGACY_DB_FILE));
+  handle.pragma("wal_checkpoint(TRUNCATE)");
+  handle.close();
+
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const from = path.join(dir, LEGACY_DB_FILE + suffix);
+    if (fs.existsSync(from)) fs.renameSync(from, path.join(dir, DB_FILE + suffix));
+  }
+  return true;
+}
+
+/**
+ * Take over data written before the rename, once.
+ *
+ * Two separate cases, and the second is the one that bites. The directory is
+ * only moved when it is the default and nothing already sits at the new path.
+ * But a service unit installed under the old name has the old directory baked
+ * into it, so the app can be pointed straight at a folder holding a
+ * `tvarr.db` — and creating an empty `vaka.db` beside it would look exactly
+ * like the library had vanished. So the file is adopted wherever it is found.
+ *
+ * Nothing is ever deleted or overwritten: every step is a rename into a name
+ * that is not taken, and on any failure the old data is left exactly as it was.
+ */
+function adoptLegacyData(dir: string): void {
+  const legacy = path.join(os.homedir(), LEGACY_DIR_NAME);
+  const canMoveDir =
+    dir === defaultDataDir() && !fs.existsSync(dir) && fs.existsSync(legacy);
+
+  try {
+    if (canMoveDir) {
+      // Rename inside the old directory first: a failure here leaves
+      // everything where it was, rather than half-moved under the new name.
+      renameLegacyDb(legacy);
+      fs.renameSync(legacy, dir);
+      console.log(`vaka: moved your data from ${legacy} to ${dir}`);
+      return;
+    }
+
+    if (fs.existsSync(dir) && renameLegacyDb(dir)) {
+      console.log(`vaka: renamed ${LEGACY_DB_FILE} to ${DB_FILE} in ${dir}`);
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(
+      `vaka: could not take over the data written as tvarr (${reason}). ` +
+        `Nothing was changed — rename it by hand, or point VAKA_DATA_DIR at it.`,
+    );
+  }
 }
 
 export function expandHome(input: string): string {
@@ -273,15 +355,80 @@ function applyMigrations(db: Db): void {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Migration reporting                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface DataMigration {
+  /** Where data lives once this process opens it. */
+  current: string;
+  /** Directory that will be moved wholesale to {@link current}. */
+  movingFrom: string | null;
+  /** Directory holding a `tvarr.db` that will be renamed where it sits. */
+  renamingIn: string | null;
+  /** A pre-rename directory that will be left behind, and why. */
+  strandedDir: string | null;
+  /** Pre-rename environment variables set in this process. */
+  legacyEnv: string[];
+}
+
+/**
+ * What opening the database will do about pre-rename data — without doing it.
+ *
+ * Deliberately opens nothing: the point of a check is to be able to run it
+ * before committing to the move, and {@link getDb} performs that move as a
+ * side effect. The conditions below mirror {@link adoptLegacyData} exactly.
+ */
+export function inspectDataMigration(): DataMigration {
+  const current = dataDir();
+  const legacy = path.join(os.homedir(), LEGACY_DIR_NAME);
+
+  const legacyEnv = ["TVARR_DATA_DIR", "TVARR_DEV_ORIGINS"].filter(
+    (name) => (process.env[name] ?? "").trim().length > 0,
+  );
+
+  const report: DataMigration = {
+    current,
+    movingFrom: null,
+    renamingIn: null,
+    strandedDir: null,
+    legacyEnv,
+  };
+
+  const legacyExists = fs.existsSync(legacy);
+  const currentExists = fs.existsSync(current);
+
+  if (current === defaultDataDir() && !currentExists && legacyExists) {
+    report.movingFrom = legacy;
+    return report;
+  }
+
+  if (
+    currentExists &&
+    !fs.existsSync(path.join(current, DB_FILE)) &&
+    fs.existsSync(path.join(current, LEGACY_DB_FILE))
+  ) {
+    report.renamingIn = current;
+  }
+
+  // Both present: the old one is never touched, so say it is being left.
+  if (legacyExists && current !== legacy && fs.existsSync(path.join(legacy, LEGACY_DB_FILE))) {
+    report.strandedDir = legacy;
+  }
+
+  return report;
+}
+
 let cached: Db | null = null;
 
 export function getDb(): Db {
   if (cached) return cached;
 
   const dir = dataDir();
+  adoptLegacyData(dir);
   fs.mkdirSync(dir, { recursive: true });
 
-  const db = new Database(path.join(dir, "tvarr.db"));
+  const db = new Database(path.join(dir, DB_FILE));
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");

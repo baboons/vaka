@@ -1,7 +1,7 @@
 /**
  * Writing a release to disk.
  *
- * tvarr never talks to a torrent client. It drops a `.torrent` file into a
+ * vaka never talks to a torrent client. It drops a `.torrent` file into a
  * watched ("blackhole") folder and lets the client pick it up, which works
  * with every client and needs no credentials.
  */
@@ -97,7 +97,7 @@ async function fetchTorrent(
     const response = await fetch(current, {
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
       redirect: "manual",
-      headers: { accept: "application/x-bittorrent, */*", "user-agent": "tvarr/1.0" },
+      headers: { accept: "application/x-bittorrent, */*", "user-agent": "vaka/1.0" },
     });
 
     if (response.status >= 300 && response.status < 400) {
