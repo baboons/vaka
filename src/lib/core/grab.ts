@@ -1,7 +1,7 @@
 /**
  * Writing a release to disk.
  *
- * vaka never talks to a torrent client. It drops a `.torrent` file into a
+ * Vaka never talks to a torrent client. It drops a `.torrent` file into a
  * watched ("blackhole") folder and lets the client pick it up, which works
  * with every client and needs no credentials.
  */

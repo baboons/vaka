@@ -2,7 +2,7 @@
 
 [← back to the README](../README.md)
 
-vaka can take finished downloads and put them where Plex expects them:
+Vaka can take finished downloads and put them where Plex expects them:
 
 ```
 /media/TV/The Bear (2022)/Season 03/The Bear (2022) - S03E01 - Tomorrow.mkv
@@ -37,7 +37,7 @@ disappears along with any brackets around it.
 | **Copy** | Seeding continues; space is used twice. |
 | **Move** | Frees space at once, but seeding stops. |
 
-This is the only part of vaka that touches files it did not create, so the
+This is the only part of Vaka that touches files it did not create, so the
 rules are conservative:
 
 - **Nothing is overwritten.** A second copy lands as `… (1).mkv`.
@@ -49,7 +49,7 @@ rules are conservative:
 ## Retiring torrents after they have seeded
 
 Once a torrent has seeded for **N days or to a ratio** (whichever comes first,
-or both), vaka removes it from Transmission and clears the download folder.
+or both), Vaka removes it from Transmission and clears the download folder.
 Your library copy stays.
 
 What that frees depends on the mode:
@@ -63,15 +63,15 @@ What that frees depends on the mode:
 
 Two guards, since this deletes things:
 
-- **Only torrents vaka imported are ever touched.** Anything you added to
+- **Only torrents Vaka imported are ever touched.** Anything you added to
   Transmission yourself is invisible to it.
 - **The library copy is confirmed present first.** If the file was moved or
   deleted out of the library, the download is left alone and the reason logged.
 
 ## Transmission
 
-Turn on **Settings → Import → Transmission** and vaka asks which downloads have
-finished, then files them. `localhost:9091` is enough — vaka fills in the rest
+Turn on **Settings → Import → Transmission** and Vaka asks which downloads have
+finished, then files them. `localhost:9091` is enough — Vaka fills in the rest
 of the RPC URL. Nothing changes on the Transmission side beyond having remote
 access switched on.
 

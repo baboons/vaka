@@ -33,7 +33,7 @@ const EMPTY: Record<MediaKind, { title: string; description: string }> = {
   sport: {
     title: "No competitions yet",
     description:
-      "Follow a league or promotion and vaka will pull in its calendar, then watch your " +
+      "Follow a league or promotion and Vaka will pull in its calendar, then watch your " +
       "feeds for each event as it happens.",
   },
 };

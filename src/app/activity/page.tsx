@@ -11,7 +11,7 @@ import type { HistoryEvent } from "@/lib/core/types";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Activity — vaka" };
+export const metadata = { title: "Activity — Vaka" };
 
 const FILTERS: Array<{ value: string; label: string }> = [
   { value: "all", label: "Everything" },

@@ -2,7 +2,7 @@
 
 [← back to the README](../README.md)
 
-Point vaka at a Plex server under **Settings → Plex** and everything it holds is
+Point Vaka at a Plex server under **Settings → Plex** and everything it holds is
 crossed off, so the watcher never downloads a second copy. Add a show you
 already own eight seasons of and only the missing episodes stay wanted.
 
@@ -31,12 +31,12 @@ queued.
 
 Two things worth knowing:
 
-- **It is strictly read-only.** vaka asks what is on the shelves and nothing
+- **It is strictly read-only.** Vaka asks what is on the shelves and nothing
   more; it never writes to Plex.
 - **It only ever marks things as had, never as wanted again.** If Plex is
   offline, mid-scan or missing a drive, the worst case is that nothing new gets
   crossed off — not a wave of re-downloads. If you delete something from Plex
-  and want it back, mark it wanted in vaka.
+  and want it back, mark it wanted in Vaka.
 
 Episodes crossed off this way show as `1080p · Plex`, and with **upgrade**
 enabled in the quality profile a better release will still replace them.

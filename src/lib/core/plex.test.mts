@@ -210,7 +210,7 @@ test("normalizes a bare host:port into a URL", () => {
 test("reports the server name and its movie and TV sections", async () => {
   const info = await plex.testConnection(settings.getConfig().plex);
   assert.equal(info.name, "Basement");
-  // The music section is not something vaka can use.
+  // The music section is not something Vaka can use.
   assert.deepEqual(
     info.sections.map((section) => section.type),
     ["movie", "show"],

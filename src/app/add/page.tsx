@@ -194,7 +194,7 @@ function ResultCard({
  * The competition catalogue.
  *
  * Unlike shows and films this is a browse rather than a search: the list is
- * fixed, because a competition is only followable if vaka knows the tokens
+ * fixed, because a competition is only followable if Vaka knows the tokens
  * its releases use. Everything here is grouped the way someone thinks about
  * it — combat sports, football, motorsport.
  */
@@ -221,7 +221,7 @@ function SportsBrowser({
       <PageHeader
         eyebrow="Library"
         title="Follow a competition"
-        description="Pick a league or promotion and vaka pulls in its calendar, then watches your feeds for each event. Schedules come from ESPN — no key, no account."
+        description="Pick a league or promotion and Vaka pulls in its calendar, then watches your feeds for each event. Schedules come from ESPN — no key, no account."
       />
 
       <div className="space-y-8 px-5 py-6 md:px-8 md:py-8">
@@ -231,7 +231,7 @@ function SportsBrowser({
           <EmptyState
             icon={<SearchX className="size-7" />}
             title={`No competition matches “${query}”`}
-            description="Only competitions whose release naming vaka can read are listed. Clear the filter to see them all."
+            description="Only competitions whose release naming Vaka can read are listed. Clear the filter to see them all."
           />
         ) : (
           [...groups.entries()].map(([group, leagues]) => (

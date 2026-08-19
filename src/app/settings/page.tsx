@@ -32,7 +32,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Settings — vaka" };
+export const metadata = { title: "Settings — Vaka" };
 
 export default function SettingsPage() {
   const db = getDb();
@@ -127,7 +127,7 @@ export default function SettingsPage() {
             <TabsContent value="sports" className="space-y-5">
               <p className="text-[13px] leading-relaxed text-muted-foreground">
                 Competitions come from ESPN&rsquo;s public schedule — no key, no account. Because
-                sports releases carry no episode number, vaka scores each one against the
+                sports releases carry no episode number, Vaka scores each one against the
                 calendar and only downloads the matches it is sure about; the rest wait under a
                 competition&rsquo;s <span className="text-foreground/80">Releases</span> tab.
               </p>
@@ -145,7 +145,7 @@ export default function SettingsPage() {
 
             <TabsContent value="import">
               <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
-                vaka can file finished downloads into your Plex library — renaming them, and
+                Vaka can file finished downloads into your Plex library — renaming them, and
                 creating <span className="mono">Season 01</span> folders where they are missing.
                 Set the destination and naming under <span className="text-foreground/80">TV</span>,{" "}
                 <span className="text-foreground/80">Movies</span> and{" "}
@@ -162,7 +162,7 @@ export default function SettingsPage() {
 
             <TabsContent value="plex">
               <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
-                Point vaka at a Plex server and it will cross off everything you already have,
+                Point Vaka at a Plex server and it will cross off everything you already have,
                 so the watcher never downloads a second copy. Matching prefers IMDb, TVDB and
                 TMDB ids, falling back to title and year.
               </p>

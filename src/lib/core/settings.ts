@@ -102,7 +102,7 @@ const generalConfigSchema = z.object({
 /**
  * Optional Plex server, used to cross off anything you already have.
  *
- * Read-only: vaka never writes to Plex, it only asks what is on the shelves.
+ * Read-only: Vaka never writes to Plex, it only asks what is on the shelves.
  */
 const plexConfigSchema = z.object({
   enabled: z.boolean().default(false),
@@ -147,14 +147,14 @@ const importConfigSchema = z.object({
   cleanupRequireBoth: z.boolean().default(false),
 });
 
-/** Transmission's RPC endpoint, so vaka knows when a download finished. */
+/** Transmission's RPC endpoint, so Vaka knows when a download finished. */
 const transmissionConfigSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default("http://localhost:9091/transmission/rpc"),
   username: z.string().default(""),
   password: z.string().default(""),
   /**
-   * Transmission reports paths as its own process sees them. When vaka runs
+   * Transmission reports paths as its own process sees them. When Vaka runs
    * elsewhere (a container, another host), rewrite that prefix to the local
    * one — e.g. "/downloads" -> "/mnt/nas/downloads".
    */

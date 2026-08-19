@@ -15,7 +15,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { installedUnits } from "./service.mjs";
+import { installedUnits, resolvedDataDir } from "./service.mjs";
 
 import { dataDir, expandHome, getDb, inspectDataMigration } from "../src/lib/core/db";
 import { planImport } from "../src/lib/core/import";
@@ -23,6 +23,20 @@ import { describeScan, scanAll } from "../src/lib/core/import-runner";
 import * as repo from "../src/lib/core/repo";
 import { getConfig } from "../src/lib/core/settings";
 import * as transmission from "../src/lib/core/transmission";
+
+/*
+ * An installed service carries its data directory in its own environment. A
+ * shell running this by hand does not, so without this the doctor would report
+ * on `~/.vaka` while the service uses somewhere else entirely — and say the
+ * rename was finished when it had not started. Read it back out of the unit,
+ * exactly as the service manager does.
+ *
+ * Safe before the imports below have run anything: nothing reads the
+ * environment until dataDir() is first called.
+ */
+if (!process.env.VAKA_DATA_DIR?.trim() && !process.env.TVARR_DATA_DIR?.trim()) {
+  process.env.VAKA_DATA_DIR = resolvedDataDir();
+}
 
 const args = process.argv.slice(2);
 const retryIndex = args.indexOf("--retry");
@@ -67,10 +81,10 @@ function reportRename(): void {
 
   if (data.movingFrom) {
     console.log(`  Data          ${WARN} ${data.movingFrom} will move to ${data.current}`);
-    todo.push("Start vaka (or run this again) to move the folder.");
+    todo.push("Start Vaka (or run this again) to move the folder.");
   } else if (data.renamingIn) {
     console.log(`  Data          ${WARN} tvarr.db in ${data.renamingIn} will be renamed to vaka.db`);
-    todo.push("Start vaka (or run this again) to rename the database.");
+    todo.push("Start Vaka (or run this again) to rename the database.");
   } else {
     console.log(`  Data          ${OK} ${data.current}`);
   }
@@ -260,7 +274,7 @@ for (const candidate of candidates) {
     await fs.access(candidate.source);
   } catch {
     console.log(`  ${BAD} ${short}`);
-    console.log(`      vaka cannot see ${candidate.source}`);
+    console.log(`      Vaka cannot see ${candidate.source}`);
     console.log(`      ${DIM}set a path mapping under Settings → Import → Transmission${RESET}`);
     continue;
   }

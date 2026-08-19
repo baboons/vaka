@@ -7,7 +7,7 @@ import type { NextConfig } from "next";
  *
  * Next only trusts localhost by default, so opening the dev server from
  * another machine on the LAN returns 403 for every chunk and the HMR
- * websocket fails. vaka is normally run on a home server and opened from a
+ * websocket fails. Vaka is normally run on a home server and opened from a
  * laptop, so this machine's own LAN addresses are allowlisted automatically.
  *
  * Add hostnames (e.g. "vaka.local") with VAKA_DEV_ORIGINS, comma separated.

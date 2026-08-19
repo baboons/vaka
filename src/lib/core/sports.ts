@@ -4,7 +4,7 @@
  * The catalogue below is deliberately a fixed list rather than a searchable
  * remote index. There is no registry of "every competition a torrent group
  * might post", and an open-ended search would let someone follow a league
- * whose releases vaka cannot recognise. Each entry pairs a competition with
+ * whose releases Vaka cannot recognise. Each entry pairs a competition with
  * the tokens its releases actually carry, which is the only reason matching
  * works at all.
  *

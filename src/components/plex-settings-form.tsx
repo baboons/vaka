@@ -43,7 +43,7 @@ export function PlexSettingsForm({
           <span className="block text-[13px] font-medium">Use my Plex library</span>
           <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
             Anything Plex already has is crossed off, so the watcher stops looking for it.
-            vaka only reads — it never changes anything in Plex.
+            Vaka only reads — it never changes anything in Plex.
           </span>
         </span>
         <Switch
@@ -78,7 +78,7 @@ export function PlexSettingsForm({
         />
         <PlexTokenHelp />
         <p className="text-[11.5px] leading-snug text-muted-foreground">
-          Treat this like a password — it grants full access to your Plex account. vaka keeps it
+          Treat this like a password — it grants full access to your Plex account. Vaka keeps it
           in plain text in its database, so that file deserves the same care as an SSH key.
         </p>
       </div>

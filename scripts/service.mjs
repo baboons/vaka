@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Manages vaka as a background service.
+ * Manages Vaka as a background service.
  *
  *   node scripts/service.mjs install     write the unit files and (re)start
  *   node scripts/service.mjs restart     restart both processes
@@ -15,7 +15,7 @@
  * stops downloads and restarting one does not disturb the other.
  *
  * Per-user services (systemd user units on Linux, launchd LaunchAgents on
- * macOS) rather than system ones: vaka writes into your home directory and
+ * macOS) rather than system ones: Vaka writes into your home directory and
  * must run as you, not as root.
  */
 
@@ -57,7 +57,7 @@ const SERVICES = [
     unit: "vaka-watcher",
     label: "dev.vaka.watcher",
     title: "Watcher",
-    description: "vaka release watcher",
+    description: "Vaka release watcher",
     exec: () => [nodeBin, tsxCli, watcherEntry],
     env: () => ({ NO_COLOR: "1", VAKA_DATA_DIR: dataDir }),
   },
@@ -66,7 +66,7 @@ const SERVICES = [
     unit: "vaka-web",
     label: "dev.vaka.web",
     title: "Web interface",
-    description: "vaka web interface",
+    description: "Vaka web interface",
     exec: () => [nodeBin, nextCli, "start"],
     env: () => ({
       NO_COLOR: "1",
@@ -331,7 +331,7 @@ function install() {
   }
 
   console.log(`
-  vaka is installed and running.
+  Vaka is installed and running.
 
     Web interface   http://localhost:${port}
     Watcher         downloading in the background
@@ -387,7 +387,7 @@ function uninstall() {
   }
 
   if (isLinux) run("systemctl", ["--user", "daemon-reload"], { quiet: true });
-  console.log("\n  Removed the vaka services.\n");
+  console.log("\n  Removed the Vaka services.\n");
 }
 
 function start() {
@@ -398,7 +398,7 @@ function start() {
     if (isMac) run("launchctl", ["bootstrap", `gui/${process.getuid()}`, servicePath(service)]);
     else run("systemctl", ["--user", "start", service.unit]);
   }
-  console.log("\n  vaka started.\n");
+  console.log("\n  Vaka started.\n");
 }
 
 function stop() {
@@ -408,7 +408,7 @@ function stop() {
     if (isMac) run("launchctl", ["bootout", `gui/${process.getuid()}/${service.label}`], { quiet: true });
     else run("systemctl", ["--user", "stop", service.unit], { quiet: true });
   }
-  console.log("\n  vaka stopped.\n");
+  console.log("\n  Vaka stopped.\n");
 }
 
 export function restart({ silent = false } = {}) {
@@ -433,7 +433,7 @@ export function restart({ silent = false } = {}) {
     if (!restarted) ok = false;
   }
 
-  if (!silent) console.log(ok ? "\n  vaka restarted.\n" : "\n  Could not restart every service.\n");
+  if (!silent) console.log(ok ? "\n  Vaka restarted.\n" : "\n  Could not restart every service.\n");
   return ok;
 }
 

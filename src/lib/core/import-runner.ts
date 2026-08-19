@@ -41,7 +41,7 @@ function absorb(summary: ScanSummary, outcome: ImportOutcome): void {
  * Import everything Transmission has finished.
  *
  * On the very first run, existing completed torrents are recorded as seen
- * without being imported unless `importExisting` is on — connecting vaka to a
+ * without being imported unless `importExisting` is on — connecting Vaka to a
  * client with a year of history should not suddenly move a year of files.
  */
 export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
@@ -66,9 +66,9 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
     if (repo.wasImported(key, db)) continue;
     summary.considered += 1;
 
-    // Adoption is for downloads that were already there when vaka arrived —
-    // never for something vaka grabbed itself, however recently the client
-    // finished it. Without this, connecting a client on the same day vaka
+    // Adoption is for downloads that were already there when Vaka arrived —
+    // never for something Vaka grabbed itself, however recently the client
+    // finished it. Without this, connecting a client on the same day Vaka
     // grabbed an episode silently skips that episode forever.
     if (adoptWithoutImporting && !repo.wasGrabbedByVaka(torrent.name, db)) {
       repo.recordImport(
@@ -77,7 +77,7 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
           name: torrent.name,
           // "adopted" is deliberate and final; "skipped" gets retried.
           status: "adopted",
-          detail: "already complete when vaka was connected",
+          detail: "already complete when Vaka was connected",
         },
         db,
       );
@@ -112,7 +112,7 @@ export async function scanTransmission(db: Db = getDb()): Promise<ScanSummary> {
           name: torrent.name,
           path: source,
           status: "failed",
-          detail: `vaka cannot see ${source} — check the path mapping`,
+          detail: `Vaka cannot see ${source} — check the path mapping`,
         },
         db,
       );
@@ -264,7 +264,7 @@ export function hasSeededEnough(
 }
 
 /**
- * Remove torrents vaka imported once they have seeded enough.
+ * Remove torrents Vaka imported once they have seeded enough.
  *
  * Two things make this safe to run unattended:
  *   - only torrents recorded in the imports ledger are considered, so nothing
@@ -321,7 +321,7 @@ export async function cleanupSeeded(db: Db = getDb()): Promise<CleanupSummary> {
     if (!libraryFiles.length) {
       repo.markImportCleaned(
         record.sourceKey,
-        "left alone — imported before vaka tracked library paths",
+        "left alone — imported before Vaka tracked library paths",
         db,
       );
       continue;

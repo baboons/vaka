@@ -87,17 +87,17 @@ function adoptLegacyData(dir: string): void {
       // everything where it was, rather than half-moved under the new name.
       renameLegacyDb(legacy);
       fs.renameSync(legacy, dir);
-      console.log(`vaka: moved your data from ${legacy} to ${dir}`);
+      console.log(`Vaka: moved your data from ${legacy} to ${dir}`);
       return;
     }
 
     if (fs.existsSync(dir) && renameLegacyDb(dir)) {
-      console.log(`vaka: renamed ${LEGACY_DB_FILE} to ${DB_FILE} in ${dir}`);
+      console.log(`Vaka: renamed ${LEGACY_DB_FILE} to ${DB_FILE} in ${dir}`);
     }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.error(
-      `vaka: could not take over the data written as tvarr (${reason}). ` +
+      `Vaka: could not take over the data written as tvarr (${reason}). ` +
         `Nothing was changed — rename it by hand, or point VAKA_DATA_DIR at it.`,
     );
   }

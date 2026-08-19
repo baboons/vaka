@@ -2,7 +2,7 @@
  * Regressions from a real setup where nothing got filed.
  *
  * Every case here was reported by a user whose downloads sat in the completed
- * folder while vaka recorded a reason and never looked again.
+ * folder while Vaka recorded a reason and never looked again.
  */
 
 import assert from "node:assert/strict";
@@ -29,7 +29,7 @@ after(async () => {
 test("a config saved before naming existed still names TV episodes correctly", () => {
   const db = getDb();
 
-  // Exactly what an older vaka wrote: no template fields at all.
+  // Exactly what an older Vaka wrote: no template fields at all.
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('tv', ?)").run(
     JSON.stringify({
       downloadDir: "/data/watch",
@@ -110,7 +110,7 @@ test("an adopted back-catalogue download is left alone for good", () => {
       sourceKey: key,
       name: "Moonwalker.1988.1080p.BluRay.x264-OFT",
       status: "adopted",
-      detail: "already complete when vaka was connected",
+      detail: "already complete when Vaka was connected",
     },
     db,
   );

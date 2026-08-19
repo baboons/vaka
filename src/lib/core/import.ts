@@ -1,7 +1,7 @@
 /**
  * Moving finished downloads into the library.
  *
- * This is the only part of vaka that touches files it did not create, so the
+ * This is the only part of Vaka that touches files it did not create, so the
  * rules are conservative:
  *
  *   - hardlink by default, so the torrent keeps seeding and no bytes are copied
@@ -297,7 +297,7 @@ export async function planImport(
  * Which followed competition and which event a downloaded file belongs to.
  *
  * The same scoring that decided to grab it decides where it goes, so a file
- * cannot be filed under an event vaka was never confident enough to want.
+ * cannot be filed under an event Vaka was never confident enough to want.
  * Both the torrent name and the file name are tried, since either one may be
  * the one carrying the date.
  */

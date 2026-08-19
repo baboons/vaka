@@ -866,9 +866,9 @@ export function countRecentGrabs(days = 7, db: Db = getDb()): number {
 }
 
 /**
- * Did vaka itself ask for this release?
+ * Did Vaka itself ask for this release?
  *
- * Used when adopting a torrent client's existing downloads: anything vaka
+ * Used when adopting a torrent client's existing downloads: anything Vaka
  * grabbed is ours to file, however long it has been sitting there.
  *
  * Torrent names and feed titles usually match exactly, but trackers sometimes
@@ -945,7 +945,7 @@ function mapImport(row: Row): ImportRecord {
 }
 
 /**
- * How many times a download is retried before vaka gives up on it.
+ * How many times a download is retried before Vaka gives up on it.
  *
  * Most non-success verdicts are circumstantial — the download had not finished
  * moving, a library folder was not configured yet — so recording one forever

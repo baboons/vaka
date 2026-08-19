@@ -1,9 +1,9 @@
 /**
  * Transmission RPC.
  *
- * vaka polls rather than asking Transmission to run a script on completion:
+ * Vaka polls rather than asking Transmission to run a script on completion:
  * polling needs no changes to the Transmission side beyond RPC being enabled,
- * survives vaka being restarted, and cannot lose an event while vaka is down.
+ * survives Vaka being restarted, and cannot lose an event while Vaka is down.
  *
  * The one quirk worth knowing is the CSRF handshake — Transmission answers the
  * first request with 409 and a session id header, which must be echoed back on

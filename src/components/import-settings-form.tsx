@@ -123,7 +123,7 @@ export function ImportSettingsForm({
             className="mono text-[12.5px]"
           />
           <p className="text-[11.5px] leading-snug text-muted-foreground">
-            Anything that appears here is filed. Leave empty if Transmission tells vaka about
+            Anything that appears here is filed. Leave empty if Transmission tells Vaka about
             finished downloads instead.
           </p>
         </div>
@@ -299,7 +299,7 @@ export function ImportSettingsForm({
                 )}
               </p>
               <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
-                Only torrents vaka imported are touched, and never before checking the library
+                Only torrents Vaka imported are touched, and never before checking the library
                 copy is still there.
               </p>
             </div>
@@ -315,7 +315,7 @@ export function ImportSettingsForm({
         <div>
           <h3 className="text-[14px] font-semibold">Transmission</h3>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            vaka asks Transmission which downloads have finished, so files are filed as soon as
+            Vaka asks Transmission which downloads have finished, so files are filed as soon as
             they complete. Nothing needs to change in Transmission beyond having remote access
             enabled.
           </p>
@@ -338,7 +338,7 @@ export function ImportSettingsForm({
             className="mono text-[12.5px]"
           />
           <p className="text-[11.5px] leading-snug text-muted-foreground">
-            <span className="mono">localhost:9091</span> works too — vaka adds the rest.
+            <span className="mono">localhost:9091</span> works too — Vaka adds the rest.
           </p>
         </div>
 
@@ -375,7 +375,7 @@ export function ImportSettingsForm({
             <Input
               value={client.localPathPrefix}
               onChange={(event) => setClient({ ...client, localPathPrefix: event.target.value })}
-              placeholder="vaka sees /mnt/nas/downloads"
+              placeholder="Vaka sees /mnt/nas/downloads"
               className="mono text-[12.5px]"
             />
           </div>
@@ -391,7 +391,7 @@ export function ImportSettingsForm({
               Also import what is already finished
             </span>
             <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
-              Off by default: connecting vaka to a client with years of history should not
+              Off by default: connecting Vaka to a client with years of history should not
               suddenly file years of downloads. Existing torrents are noted and left alone.
             </span>
           </span>

@@ -2,7 +2,7 @@
 
 [← back to the README](../README.md)
 
-Standard RSS 2.0 and Torznab-style feeds both work. vaka reads the download
+Standard RSS 2.0 and Torznab-style feeds both work. Vaka reads the download
 link from `<link>`, `<enclosure>` or a magnet URI, and picks up size and seeder
 counts where they are published.
 
@@ -17,7 +17,7 @@ show of the same name — worth doing if you follow both *Fargo* the series and
 
 ## Magnet-only feeds
 
-If a feed offers only a magnet link, vaka writes a `.magnet` file containing
+If a feed offers only a magnet link, Vaka writes a `.magnet` file containing
 the URI. Not every client watches for those; turn it off in **Settings →
 General** to skip magnet-only releases instead.
 

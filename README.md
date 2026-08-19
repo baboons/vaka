@@ -2,10 +2,10 @@
   <img src="public/logo.svg" width="96" height="96" alt="">
 </p>
 
-<h1 align="center">vaka</h1>
+<h1 align="center">Vaka</h1>
 
 <p align="center">
-  Follow TV shows, movies and sport. vaka watches your torrent RSS feeds and
+  Follow TV shows, movies and sport. Vaka watches your torrent RSS feeds and
   downloads the qualities you asked for.
 </p>
 
@@ -89,7 +89,7 @@ For that last case, add the name releases actually use under **Quality → Also
 match these titles**. Matching is exact on a normalized title; fuzzy matching
 grabs the wrong show often enough to be a liability.
 
-For sport, a release can also be listed but *not* downloaded, because vaka was
+For sport, a release can also be listed but *not* downloaded, because Vaka was
 not sure enough that it is the right event — see
 [why it sometimes asks](docs/sports.md#why-it-sometimes-asks).
 

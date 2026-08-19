@@ -229,7 +229,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
             {isSport && (
               <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
                 Sports releases carry no episode number, so each one is scored against the
-                calendar. Anything vaka is not sure enough about is listed here rather than
+                calendar. Anything Vaka is not sure enough about is listed here rather than
                 downloaded — grab it yourself if it is the right event.
               </p>
             )}

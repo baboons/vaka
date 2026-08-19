@@ -1,5 +1,5 @@
 /**
- * Taking over data written before the app was renamed from tvarr to vaka.
+ * Taking over data written before the app was renamed from tvarr to Vaka.
  *
  * The failure this guards against is not a crash — it is the app quietly
  * creating an empty database beside a full one, which looks exactly like the
@@ -81,7 +81,7 @@ test("commits still sitting in the write-ahead log survive the rename", async ()
   assert.deepEqual(rows.map((row) => row.title), ["Ted Lasso", "The Bear"]);
 });
 
-test("an existing vaka database is never overwritten by an older one", async () => {
+test("an existing Vaka database is never overwritten by an older one", async () => {
   const dir = await legacyDir("both");
   const current = new Database(path.join(dir, "vaka.db"));
   current.exec("CREATE TABLE relic (id INTEGER PRIMARY KEY, title TEXT)");

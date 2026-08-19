@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The vaka mark: the app's own live-signal indicator — a dark core inside a
+ * The Vaka mark: the app's own live-signal indicator — a dark core inside a
  * broken scanner ring, on a signal-amber tile.
  *
  * Kept in sync with `public/logo.svg` and `src/app/icon.svg` (the favicon).
@@ -12,7 +12,7 @@ export function LogoMark({ className }: { className?: string }) {
       viewBox="0 0 64 64"
       className={cn("size-6", className)}
       role="img"
-      aria-label="vaka"
+      aria-label="Vaka"
     >
       <defs>
         <linearGradient id="vaka-tile" x1="0" y1="0" x2="0" y2="1">

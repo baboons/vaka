@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Updates vaka in place and restarts it.
+ * Updates Vaka in place and restarts it.
  *
  *   node scripts/update.mjs              pull, install, build, restart
  *   node scripts/update.mjs --no-build   skip the web build (watcher-only hosts)
@@ -113,7 +113,7 @@ if (!skipBuild) {
   if (!run("pnpm", ["build"]).ok) {
     // Deliberately left running: old code serving is better than nothing
     // serving, and the operator can retry once the build is fixed.
-    fail("The build failed. vaka was left running on the old code.");
+    fail("The build failed. Vaka was left running on the old code.");
   }
 }
 
@@ -166,5 +166,5 @@ if (isInstalled()) {
 }
 
 console.log(`
-  vaka is up to date at ${after.slice(0, 8)}.
+  Vaka is up to date at ${after.slice(0, 8)}.
 `);

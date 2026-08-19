@@ -3,11 +3,11 @@
 [← back to the README](../README.md)
 
 You follow a **competition** — UFC, the Premier League, the NHL, Formula 1 —
-and vaka pulls its calendar from ESPN's public schedule, then watches your
+and Vaka pulls its calendar from ESPN's public schedule, then watches your
 feeds for each event.
 
 Browse the catalogue under **Add → Sports**. It is a fixed list rather than an
-open search: a competition is only followable if vaka can read the tokens its
+open search: a competition is only followable if Vaka can read the tokens its
 releases carry, and following one it cannot read would match nothing.
 
 ## Two things to choose

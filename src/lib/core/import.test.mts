@@ -1,7 +1,7 @@
 /**
  * Importing finished downloads into a Plex-shaped library.
  *
- * This is the only code in vaka that touches files the user already had, so
+ * This is the only code in Vaka that touches files the user already had, so
  * the safety properties matter as much as the happy path: never overwrite,
  * never destroy the source when hardlinking, never write outside the library.
  */
@@ -282,9 +282,9 @@ test("move mode relocates the file instead of linking it", async () => {
   await assert.rejects(() => fs.stat(source), "the source should be gone after a move");
 });
 
-test("recognises a download vaka grabbed itself, however it is punctuated", () => {
+test("recognises a download Vaka grabbed itself, however it is punctuated", () => {
   // Adoption of a torrent client's existing downloads must never swallow
-  // something vaka asked for: that silently loses the episode forever.
+  // something Vaka asked for: that silently loses the episode forever.
   const db = getDb();
   repo.addHistory(
     {

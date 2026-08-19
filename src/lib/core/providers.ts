@@ -340,7 +340,7 @@ export async function cinemetaCatalog(
 /**
  * Resolve an IMDb id to the TVmaze show.
  *
- * Discovery lists series by IMDb id, but vaka tracks TV through TVmaze
+ * Discovery lists series by IMDb id, but Vaka tracks TV through TVmaze
  * because that is where the episode lists come from. TVmaze answers this
  * lookup with a 301 to the show, which fetch follows.
  */

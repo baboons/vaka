@@ -21,7 +21,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "vaka — release watcher",
+  title: "Vaka — release watcher",
   description:
     "Follow TV shows and movies, watch your torrent RSS feeds and download the qualities you want.",
 };
@@ -67,7 +67,7 @@ function Wordmark({ compact = false }: { compact?: boolean }) {
       <LogoMark className="size-6 shrink-0" />
       <span className="leading-none">
         <span className="block text-[17px] font-bold tracking-[-0.02em] text-foreground">
-          vaka
+          Vaka
         </span>
         {!compact && (
           <span className="label-mono mt-1 block text-[9px]">Release watcher</span>

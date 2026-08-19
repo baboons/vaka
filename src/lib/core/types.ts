@@ -1,5 +1,5 @@
 /**
- * Shared domain types for vaka.
+ * Shared domain types for Vaka.
  *
  * A single `media` row models a TV show, a movie or a sports competition;
  * `kind` discriminates. TV shows own `episodes` rows and so do competitions —
